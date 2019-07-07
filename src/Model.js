@@ -1,4 +1,4 @@
-const Data = require('./Data.js');
+const Data = require('./data.js');
 const axios = require('axios');
 const pluralize = require('pluralize');
 

@@ -1,4 +1,4 @@
-class Data {
+module.exports = class Data {
     constructor(data) {
         this.data = data;
     }
@@ -32,6 +32,4 @@ class Data {
     remove(property) {
 
     }
-}
-
-module.exports = Data;
+};

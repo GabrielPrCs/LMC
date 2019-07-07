@@ -1,7 +1,5 @@
-const Data = require('./Data.js').default;
+const Data = require('./data.js');
 const axios = require('axios');
 const pluralize = require('pluralize');
 
-class Collection {}
-
-module.exports = Collection;
+module.exports = class Collection {};

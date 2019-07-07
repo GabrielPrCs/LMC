@@ -1,0 +1,22 @@
+{
+  "name": "laravel-model-collection",
+  "version": "0.0.1",
+  "description": "A JS library to fetch, save/update and delete records from a Laravel API.",
+  "main": "main.js",
+  "dependencies": {
+    "axios": "^0.19.0",
+    "pluralize": "^8.0.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "laravel",
+    "js",
+    "vue", "vue.js", "vuejs",
+    "api"
+  ],
+  "author": "Gabriel Prieto Cassano",
+  "license": "MIT"
+}

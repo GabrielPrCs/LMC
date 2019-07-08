@@ -5,6 +5,7 @@
   "main": "main.js",
   "dependencies": {
     "axios": "^0.19.0",
+    "lodash": "^4.17.11",
     "pluralize": "^8.0.0"
   },
   "devDependencies": {},
@@ -14,7 +15,9 @@
   "keywords": [
     "laravel",
     "js",
-    "vue", "vue.js", "vuejs",
+    "vue",
+    "vue.js",
+    "vuejs",
     "api"
   ],
   "author": "Gabriel Prieto Cassano",

@@ -1,6 +1,7 @@
 const Data = require('./data.js');
 const axios = require('axios');
 const pluralize = require('pluralize');
+const _ = require('lodash');
 
 module.exports = class Model {
 
@@ -13,7 +14,6 @@ module.exports = class Model {
          * Extra configuration
          */
         this._name = config.hasOwnProperty('name') ? config.name : pluralize(this.constructor.name).toLowerCase();
-        this._basePath = config.hasOwnProperty('basePath') ? config.basePath : '';
     }
 
     get values() {
@@ -21,7 +21,7 @@ module.exports = class Model {
     }
 
     set values(values) {
-        this._values.values = values;
+        this._values.values = { ...values };
     }
 
     get syncValues() {
@@ -29,7 +29,7 @@ module.exports = class Model {
     }
 
     set syncValues(values) {
-        this._syncValues.values = values;
+        this._syncValues.values = { ...values };
     }
 
     get loading() {
@@ -54,6 +54,13 @@ module.exports = class Model {
     /**
      * 
      */
+    get id() {
+        return this.values[this.key()];
+    }
+
+    /**
+     * 
+     */
     defaults() {
         return {
             id: null
@@ -64,27 +71,34 @@ module.exports = class Model {
      * Returns the model's values object to the last sync status. The current values object is lost.
      */
     rollback() {
-        this.values = this.syncValues;
+        this.values = { ...this.syncValues };
     }
 
     /**
      * Sets the sync object to the current model's values object. The previous sync status is lost.
      */
     sync() {
-        this.syncValues = this.values;
+        this.syncValues = { ...this.values };
     }
 
     /**
      * Sets the model's values object to it's defaults values.
      */
     clear() {
-        this.values = this.defaults();
+        this.values = this.defaults(); // As defaults() returns a new object each time, we don't need to user { ...this.defaults() }.
+    }
+
+    /**
+     * Determines if the model's values has changed since the last call of sync method.
+     */
+    get dirty() {
+        return !_.isEqual(this.values, this.syncValues);
     }
 
     /**
      * 
      */
-    methods() {
+    defaultMethods() {
         return {
             fetch: 'GET',
             save: 'POST',
@@ -96,7 +110,14 @@ module.exports = class Model {
     /**
      * 
      */
-    responseCodes() {
+    methods() {
+        return this.defaultMethods();
+    }
+
+    /**
+     * 
+     */
+    defaultResponseCodes() {
         return {
             success: 200,
             notFound: 404,
@@ -108,7 +129,14 @@ module.exports = class Model {
     /**
      * 
      */
-    routes() {
+    responseCodes() {
+        return this.defaultResponseCodes();
+    }
+
+    /**
+     * 
+     */
+    defaultRoutes() {
         return {
             fetch: `/${this.name}/{id}`,
             save: `/${this.name}`,
@@ -120,37 +148,67 @@ module.exports = class Model {
     /**
      * 
      */
-    composeRoute(route) {
-        const routes = this.routes();
-
-        let plainRoute = routes.hasOwnProperty(route) ? routes[route] : '';
-
-        return this._basePath + plainRoute.replace('{id}', this.values[this.key()]);
+    routes() {
+        return this.defaultRoutes();
     }
 
     /**
      * 
      */
-    fetch() {
+    basePath() {
+        return '';
+    }
+
+    /**
+     * 
+     */
+    axiosConfigFor(action) {
+        const routes = {
+            ...this.defaultRoutes(),
+            ...this.routes()
+        };
+
+        const methods = {
+            ...this.defaultMethods(),
+            ...this.methods()
+        };
+
+        if (!routes.hasOwnProperty(action)) throw `The route for the ${action} action does not exists.`;
+        if (!methods.hasOwnProperty(action)) throw `The method for the ${action} action does not exists.`;
+
+        return {
+            method: methods[action],
+            url: this.basePath() + routes[action].replace('{id}', this.id)
+        };
+    }
+
+    /**
+     * 
+     */
+    async fetch() {
+        let config;
+
+        try {
+            config = this.axiosConfigFor('fetch');
+        }
+        catch(e) {
+            throw e;
+        }
+
         return new Promise((resolve, reject) => {
-
-            const config = {
-                method: this.methods().fetch,
-                url: this.composeRoute('fetch')
-            };
-
             const clear = x => this.loading = false;
 
             const success = response => {
                 this.values = response.data;
+                this.sync();
 
                 clear();
-                resolve();
+                resolve(response);
             };
 
             const error = error => {
-                // clear();
-                // reject();
+                clear();
+                reject(error);
             };
 
             this.loading = true;
@@ -162,7 +220,7 @@ module.exports = class Model {
     /**
      * 
      */
-    save() {
+    async save() {
         let route = this.values.id ? this.routes().update : this.routes().save;
 
         return route;
@@ -171,7 +229,7 @@ module.exports = class Model {
     /**
      * 
      */
-    delete() {
+    async delete() {
         let route = this.routes().delete;
 
         return route;

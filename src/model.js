@@ -1,19 +1,53 @@
 const Data = require('./data.js');
-const axios = require('axios');
+const Requestable = require('./requestable');
 const pluralize = require('pluralize');
 const _ = require('lodash');
 
-module.exports = class Model {
+const {
+    MODEL
+} = require('./events');
 
-    constructor(values, config = {}) {
-        this._loading = false;
-        this._values = new Data(values);
-        this._syncValues = new Data(values);
+module.exports = class Model extends Requestable {
 
-        /**
-         * Extra configuration
-         */
-        this._name = config.hasOwnProperty('name') ? config.name : pluralize(this.constructor.name).toLowerCase();
+    constructor(values, collection = null) {
+        super();
+
+        this._values = new Data({
+            ...this.defaults(),
+            ...values
+        });
+
+        this._syncValues = new Data({
+            ...this.defaults(),
+            ...values
+        });
+
+        this._observers = [];
+
+        if (collection != null) collection.add(this);
+    }
+
+    /**
+     * 
+     */
+    addObserver(observer) {
+        if (typeof observer.notify !== 'function') throw "The observer has to implement the notify function.";
+
+        if (_.findIndex(this._observers, observer) < 0) this._observers.push(observer);
+    }
+
+    /**
+     * 
+     */
+    removeObserver(filter) {
+        _.remove(this._observers, filter);
+    }
+
+    /**
+     * 
+     */
+    fire(event) {
+        this._observers.forEach(observer => observer.notify(event, this));
     }
 
     get values() {
@@ -21,7 +55,10 @@ module.exports = class Model {
     }
 
     set values(values) {
-        this._values.values = { ...values };
+        this._values.values = {
+            ...this.defaults(),
+            ...values
+        };
     }
 
     get syncValues() {
@@ -29,63 +66,17 @@ module.exports = class Model {
     }
 
     set syncValues(values) {
-        this._syncValues.values = { ...values };
-    }
-
-    get loading() {
-        return this._loading;
-    }
-
-    set loading(value) {
-        this._loading = value;
-    }
-
-    get name() {
-        return this._name;
-    }
-
-    /**
-     * Determines which property of the model's values will be used as the primary key.
-     */
-    key() {
-        return 'id';
+        this._syncValues.values = {
+            ...this.defaults(),
+            ...values
+        };
     }
 
     /**
      * 
      */
     get id() {
-        return this.values[this.key()];
-    }
-
-    /**
-     * 
-     */
-    defaults() {
-        return {
-            id: null
-        };
-    }
-
-    /**
-     * Returns the model's values object to the last sync status. The current values object is lost.
-     */
-    rollback() {
-        this.values = { ...this.syncValues };
-    }
-
-    /**
-     * Sets the sync object to the current model's values object. The previous sync status is lost.
-     */
-    sync() {
-        this.syncValues = { ...this.values };
-    }
-
-    /**
-     * Sets the model's values object to it's defaults values.
-     */
-    clear() {
-        this.values = this.defaults(); // As defaults() returns a new object each time, we don't need to user { ...this.defaults() }.
+        return this.values[Model.key()];
     }
 
     /**
@@ -98,39 +89,24 @@ module.exports = class Model {
     /**
      * 
      */
-    defaultMethods() {
+    name() {
+        return pluralize(this.constructor.name.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-')).toLowerCase();
+    }
+
+    /**
+     * Determines which property of the model's values will be used as the primary key.
+     */
+    static key() {
+        return 'id';
+    }
+
+    /**
+     * The defaults values for each one of the model properties.
+     */
+    defaults() {
         return {
-            fetch: 'GET',
-            save: 'POST',
-            update: 'PATCH',
-            delete: 'DELETE'
+            id: null
         };
-    }
-
-    /**
-     * 
-     */
-    methods() {
-        return this.defaultMethods();
-    }
-
-    /**
-     * 
-     */
-    defaultResponseCodes() {
-        return {
-            success: 200,
-            notFound: 404,
-            validationError: 422,
-            internalServerError: 500
-        };
-    }
-
-    /**
-     * 
-     */
-    responseCodes() {
-        return this.defaultResponseCodes();
     }
 
     /**
@@ -138,82 +114,58 @@ module.exports = class Model {
      */
     defaultRoutes() {
         return {
-            fetch: `/${this.name}/{id}`,
-            save: `/${this.name}`,
-            update: `/${this.name}/{id}`,
-            delete: `/${this.name}/{id}`
+            save: `/${this.name()}`,
+            fetch: `/${this.name()}/${this.id}`,
+            update: `/${this.name()}/${this.id}`,
+            delete: `/${this.name()}/${this.id}`
         };
     }
 
     /**
-     * 
+     * Returns the model's values object to the last sync status. The current values object is lost.
      */
-    routes() {
-        return this.defaultRoutes();
+    rollback() {
+        this.values = this.syncValues;
+        this.fire(MODEL.ROLLBACK);
     }
 
     /**
-     * 
+     * Sets the sync object to the current model's values object. The previous sync status is lost.
      */
-    basePath() {
-        return '';
+    sync() {
+        this.syncValues = this.values;
+        this.fire(MODEL.SYNC);
     }
 
     /**
-     * 
+     * Sets the model's values object to it's defaults values.
      */
-    axiosConfigFor(action) {
-        const routes = {
-            ...this.defaultRoutes(),
-            ...this.routes()
-        };
-
-        const methods = {
-            ...this.defaultMethods(),
-            ...this.methods()
-        };
-
-        if (!routes.hasOwnProperty(action)) throw `The route for the ${action} action does not exists.`;
-        if (!methods.hasOwnProperty(action)) throw `The method for the ${action} action does not exists.`;
-
-        return {
-            method: methods[action],
-            url: this.basePath() + routes[action].replace('{id}', this.id)
-        };
+    clear() {
+        this.values = this.defaults(); // As defaults() returns a new object each time, we don't need to use { ...this.defaults() }.
     }
 
     /**
      * 
      */
     async fetch() {
-        let config;
-
-        try {
-            config = this.axiosConfigFor('fetch');
-        }
-        catch(e) {
-            throw e;
-        }
-
         return new Promise((resolve, reject) => {
-            const clear = x => this.loading = false;
 
             const success = response => {
+
                 this.values = response.data;
+
                 this.sync();
 
-                clear();
+                this.fire(MODEL.FETCHED);
+
                 resolve(response);
             };
 
-            const error = error => {
-                clear();
-                reject(error);
-            };
-
-            this.loading = true;
-
-            axios(config).then(success).catch(error);
+            try {
+                this.requester('fetch').then(success).catch(error => reject(error));
+            } catch (e) {
+                throw e;
+            }
         });
     }
 
@@ -223,6 +175,8 @@ module.exports = class Model {
     async save() {
         let route = this.values.id ? this.routes().update : this.routes().save;
 
+        this.fire(MODEL.SAVED);
+
         return route;
     }
 
@@ -231,6 +185,8 @@ module.exports = class Model {
      */
     async delete() {
         let route = this.routes().delete;
+
+        this.fire(MODEL.DELETED);
 
         return route;
     }

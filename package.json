@@ -10,7 +10,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "node ./tests/models.js"
+    "test": "node ./tests.js"
   },
   "keywords": [
     "laravel",

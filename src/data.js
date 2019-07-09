@@ -1,5 +1,5 @@
 module.exports = class Data {
-    constructor(data) {
+    constructor(data = null) {
         this.data = data;
     }
 
@@ -8,15 +8,6 @@ module.exports = class Data {
     }
 
     set values(data) {
-        this.updatedAt = Date.now();
         this.data = data;
-    }
-
-    clear(property) {
-        this.set(property)
-    }
-
-    remove(property) {
-
     }
 };

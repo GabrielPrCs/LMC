@@ -1,7 +1,7 @@
-const _ = require('lodash');
-const pluralize = require('pluralize');
+import * as _ from 'lodash';
+import * as pluralize from 'pluralize';
 
-module.exports = class Utils {
+export abstract class Utils {
     /**
      * 
      */
@@ -60,5 +60,12 @@ module.exports = class Utils {
      */
     static classNameToApiRoute(className) {
         return pluralize(className.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-')).toLowerCase();
+    }
+
+    /**
+     * 
+     */
+    static inArray(array, what): boolean {
+        return Utils.findIndex(array, what) < 0;
     }
 };

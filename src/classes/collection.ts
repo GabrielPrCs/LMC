@@ -1,56 +1,50 @@
-const Utils = require('./utils');
-const Data = require('./data.js');
-const Requestable = require('./requestable');
+import { Utils } from './utils';
+import { Requestable } from './requestable';
+import { Model } from './model';
+import { MODEL_DELETED } from '../interfaces/observable-events';
+import { ObservableEvent, Observer } from '../interfaces/observer-observable';
+import { ModelValues } from '../interfaces/data-types';
 
-const {
-    MODEL
-} = require('./events');
+export abstract class Collection extends Requestable implements Observer {
+    private _models: Array<Model> = [];
 
-module.exports = class Collection extends Requestable {
-    constructor(models = []) {
+    constructor(models: Array<Model> = []) {
         super();
 
-        this._models = new Data([]);
         models.forEach(item => this.implace(item));
     }
 
-    notify(event, model) {
+    notify(event: ObservableEvent, model: Model) {
         switch (event) {
-            case MODEL.DELETED:
+            case MODEL_DELETED:
                 model.removeObserver(this);
                 this.remove(model.values[this.model().key()]);
                 break;
         }
     }
 
-    get models() {
-        return this._models.values;
+    get models(): Array<Model> {
+        return this._models;
     }
 
-    set models(models) {
-        this._models.values = [...models];
+    set models(models: Array<Model>) {
+        this._models = [...models];
     }
 
-    get dirtyModels() {
-        return this.filter(model => model.dirty);
+    get dirtyModels(): Array<Model> {
+        return this.filter((model: Model) => model.dirty);
     }
 
     plainJS() {
         return this.models.map(model => model.plainJS());
     }
 
-    name() {
-        return Utils.classNameToApiRoute(this.constructor.name);
-    }
-
-    model() {
-        return Model;
-    }
+    abstract model();
 
     /**
      * 
      */
-    defaultRoutes() {
+    protected defaultRoutes() {
         return {
             fetch: `/${this.name()}`,
         };
@@ -66,7 +60,7 @@ module.exports = class Collection extends Requestable {
     /**
      * 
      */
-    add(model) {
+    add(model: Model) {
         this.models.push(model);
         model.addObserver(this);
     }
@@ -74,7 +68,7 @@ module.exports = class Collection extends Requestable {
     /**
      * 
      */
-    implace(values) {
+    implace(values: ModelValues) {
         let TModel = this.model();
         this.add(new TModel(values));
     }
@@ -105,7 +99,7 @@ module.exports = class Collection extends Requestable {
     /**
      * 
      */
-    filter(filter) {
+    filter(filter): Array<Model> {
         return Utils.filter(this.models, filter);
     }
 

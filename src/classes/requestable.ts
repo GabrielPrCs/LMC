@@ -1,21 +1,38 @@
-const axios = require('axios');
+import axios from 'axios';
+import { Utils } from './utils';
 
-module.exports = class Requestable {
+export abstract class Requestable {
+    private _loading: boolean;
+
     constructor() {
         this._loading = false;
+    }
+    
+    /**
+     * A string to be concatened at the beginning of each route.
+     */
+    basePath() {
+        return '';
+    }
+
+    /**
+     * 
+     */
+    name(): string {
+        return Utils.classNameToApiRoute(this.constructor.name);
     }
 
     /**
      * The error code number returned when the validation of a request's parameters fails.
      */
-    validationErrorCode() {
+    validationErrorCode(): number {
         return 422;
     }
 
     /**
      * 
      */
-    defaultMethods() {
+    protected defaultMethods() {
         return {
             save: 'POST',
             fetch: 'GET',
@@ -29,13 +46,13 @@ module.exports = class Requestable {
      * 
      */
     methods() {
-        return this.defaultMethods();
+        return {};
     }
 
     /**
      * 
      */
-    defaultRoutes() {
+    protected defaultRoutes() {
         return {};
     }
 
@@ -43,14 +60,7 @@ module.exports = class Requestable {
      * The routes for this model. If not is overridden, then returns the defaults.
      */
     routes() {
-        return this.defaultRoutes();
-    }
-
-    /**
-     * A string to be concatened at the beginning of each route.
-     */
-    basePath() {
-        return '';
+        return {};
     }
 
     get loading() {
@@ -65,15 +75,9 @@ module.exports = class Requestable {
      * 
      */
     request(action, data = {}) {
-        const routes = {
-            ...this.defaultRoutes(),
-            ...this.routes()
-        };
+        const routes = { ...this.defaultRoutes(), ...this.routes() };
 
-        const methods = {
-            ...this.defaultMethods(),
-            ...this.methods()
-        };
+        const methods = { ...this.defaultMethods(), ...this.methods() };
 
         if (!routes.hasOwnProperty(action)) throw `The route for the ${action} action does not exists.`;
         if (!methods.hasOwnProperty(action)) throw `The method for the ${action} action does not exists.`;
@@ -92,7 +96,7 @@ module.exports = class Requestable {
         };
 
         return new Promise((resolve, reject) => {
-            const clear = x => this.loading = false;
+            const clear = () => this.loading = false;
 
             const success = response => {
                 clear();

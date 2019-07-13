@@ -1,6 +1,7 @@
-const Collection = require('./collection');
+import { Collection } from './collection';
 
-module.exports = class PaginatedCollection extends Collection {
+export abstract class PaginatedCollection extends Collection {
+    private _currentPage: number;
 
     constructor(models = [], page = 1) {
         super(models);
@@ -21,7 +22,7 @@ module.exports = class PaginatedCollection extends Collection {
         return 'page';
     }
 
-    paginationData(response) {}
+    paginationData(response) { }
 
     /**
      * 
@@ -48,7 +49,7 @@ module.exports = class PaginatedCollection extends Collection {
     /**
      * 
      */
-    async nextPage(params) {
+    async nextPage(params = {}) {
         this.currentPage++;
         return this.fetch(params);
     }
@@ -56,12 +57,12 @@ module.exports = class PaginatedCollection extends Collection {
     /**
      * 
      */
-    async previousPage(params) {
+    async previousPage(params = {}) {
         this.currentPage--;
         return this.fetch(params);
     }
 
-    async goToPage(number, params) {
+    async goToPage(number, params = {}) {
         this.currentPage = number;
         return this.fetch(params);
     }

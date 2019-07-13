@@ -1,44 +1,29 @@
-const Utils = require('./utils');
-const Data = require('./data');
-const Requestable = require('./requestable');
+import { Utils } from './utils';
+import { Requestable } from './requestable';
+import { MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from './events';
+import { Collection } from './collection';
+import { ObservableEvent, Observer, Observable } from '../interfaces/observer-observable';
 
-const {
-    MODEL
-} = require('./events');
+interface ModelValues {
+    id?: number,
+    [key: string]: any
+};
 
-module.exports = class Model extends Requestable {
-    /**
-     * Data     _values
-     * Data     _syncValues
-     * Boolean  _deleted
-     * Array    _observers
-     */
-    constructor(values = {}, collection = null) {
+export abstract class Model extends Requestable implements Observable {
+
+    private _values: ModelValues;
+    private _syncValues: ModelValues;
+    private _deleted: boolean = false;
+    private _observers: Array<Observer> = [];
+
+    constructor(values: ModelValues = {}, collection?: Collection) {
         super();
 
-        this._values = new Data({
-            ...this.defaults(),
-            ...values
-        });
+        this.values = values;
 
-        this._syncValues = new Data({
-            ...this.defaults(),
-            ...values
-        });
+        this.syncValues = values;
 
-        this._deleted = false;
-
-        this._observers = [];
-
-        if (collection != null) collection.add(this);
-    }
-
-    /**
-     * Generates a name for the model. The name will be the model's class name, in plural and lowercase.
-     * The name will be used to generate the dafault routes for the model.
-     */
-    name() {
-        return Utils.classNameToApiRoute(this.constructor.name);
+        if (collection) collection.add(this);
     }
 
     /**
@@ -49,25 +34,23 @@ module.exports = class Model extends Requestable {
     }
 
     /**
-     * Adds an observer that will be notified when an event is fired. The observer must implement a notify function.
+     * Adds an observer that will be notified when an event is fired.
      */
-    addObserver(observer) {
-        if (typeof observer.notify !== 'function') throw "The observer has to implement the notify function.";
-
-        if (Utils.findIndex(this._observers, observer) < 0) this._observers.push(observer);
+    addObserver(observer: Observer) {
+        if (Utils.inArray(this._observers, observer)) this._observers.push(observer);
     }
 
     /**
      * Removes the observer that matches with the filter criteria from the list of observers.
      */
-    removeObserver(filter) {
-        Utils.remove(this._observers, filter);
+    removeObserver(observer: Observer) {
+        Utils.remove(this._observers, observer);
     }
 
     /**
      * Notifies to each observer that a event has happened.
      */
-    fire(event) {
+    fire(event: ObservableEvent) {
         this._observers.forEach(observer => observer.notify(event, this));
     }
 
@@ -86,30 +69,22 @@ module.exports = class Model extends Requestable {
      * The current status of the model.
      */
     get values() {
-        return this._values.values;
+        return this._values;
     }
 
     set values(values) {
-        this._values.values = {
-            ...this.defaults(),
-            ...this.values,
-            ...values
-        };
+        this._values = { ...this.defaults(), ...this.values, ...values };
     }
 
     /**
      * The last synchronized status of the model.
      */
     get syncValues() {
-        return this._syncValues.values;
+        return this._syncValues;
     }
 
     set syncValues(values) {
-        this._syncValues.values = {
-            ...this.defaults(),
-            ...this.syncValues,
-            ...values
-        };
+        this._syncValues = { ...this.defaults(), ...this.syncValues, ...values };
     }
 
     /**
@@ -159,7 +134,7 @@ module.exports = class Model extends Requestable {
     /**
      * 
      */
-    defaultRoutes() {
+    protected defaultRoutes() {
         return {
             save: `/${this.name()}`,
             fetch: `/${this.name()}/${this.id}`,
@@ -181,7 +156,7 @@ module.exports = class Model extends Requestable {
      */
     rollback() {
         this.values = this.syncValues;
-        this.fire(MODEL.ROLLBACK);
+        this.fire(MODEL_ROLLBACK);
     }
 
     /**
@@ -189,7 +164,7 @@ module.exports = class Model extends Requestable {
      */
     sync() {
         this.syncValues = this.values;
-        this.fire(MODEL.SYNC);
+        this.fire(MODEL_SYNC);
     }
 
     /**
@@ -200,7 +175,7 @@ module.exports = class Model extends Requestable {
     }
 
     /**
-     * Fires the MODEL.FETCHED event on success.
+     * Fires the MODEL_FETCHED event on success.
      */
     async fetch() {
         return new Promise((resolve, reject) => {
@@ -209,7 +184,7 @@ module.exports = class Model extends Requestable {
 
                 this.sync();
 
-                this.fire(MODEL.FETCHED);
+                this.fire(MODEL_FETCHED);
 
                 resolve(response);
             };
@@ -219,7 +194,7 @@ module.exports = class Model extends Requestable {
     }
 
     /**
-     * Fires the MODEL.SAVED event on success.
+     * Fires the MODEL_SAVED event on success.
      */
     async save() {
         return new Promise((resolve, reject) => {
@@ -234,7 +209,7 @@ module.exports = class Model extends Requestable {
 
                 this.sync();
 
-                this.fire(MODEL.SAVED);
+                this.fire(MODEL_SAVED);
 
                 resolve(response);
             };
@@ -251,13 +226,13 @@ module.exports = class Model extends Requestable {
      * Deletes the model from the backend. The values of the model are not changed, so they can still be accessed.
      * If the backend uses soft deletion, this values (including the id) can be used to restore the data.
      * 
-     * Fires the MODEL.DELETED event on success.
+     * Fires the MODEL_DELETED event on success.
      */
     async delete() {
         return new Promise((resolve, reject) => {
             const success = response => {
                 this.deleted = true;
-                this.fire(MODEL.DELETED);
+                this.fire(MODEL_DELETED);
                 resolve(response);
             };
 

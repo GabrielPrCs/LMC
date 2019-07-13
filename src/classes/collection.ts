@@ -1,12 +1,13 @@
-const Utils = require('./utils');
-const Data = require('./data.js');
-const Requestable = require('./requestable');
+import { Utils } from './utils';
+import { Data } from './data';
+import { Requestable } from './requestable';
+import { Model } from './model';
+import { MODEL_DELETED } from './events';
+import { ObservableEvent, Observer, Observable } from '../interfaces/observer-observable';
 
-const {
-    MODEL
-} = require('./events');
+export abstract class Collection extends Requestable implements Observer {
+    private _models: Data;
 
-module.exports = class Collection extends Requestable {
     constructor(models = []) {
         super();
 
@@ -14,9 +15,9 @@ module.exports = class Collection extends Requestable {
         models.forEach(item => this.implace(item));
     }
 
-    notify(event, model) {
+    notify(event: ObservableEvent, model: Model) {
         switch (event) {
-            case MODEL.DELETED:
+            case MODEL_DELETED:
                 model.removeObserver(this);
                 this.remove(model.values[this.model().key()]);
                 break;
@@ -27,7 +28,7 @@ module.exports = class Collection extends Requestable {
         return this._models.values;
     }
 
-    set models(models) {
+    set models(models: Array<Model>) {
         this._models.values = [...models];
     }
 
@@ -39,18 +40,12 @@ module.exports = class Collection extends Requestable {
         return this.models.map(model => model.plainJS());
     }
 
-    name() {
-        return Utils.classNameToApiRoute(this.constructor.name);
-    }
-
-    model() {
-        return Model;
-    }
+    abstract model()
 
     /**
      * 
      */
-    defaultRoutes() {
+    protected defaultRoutes() {
         return {
             fetch: `/${this.name()}`,
         };
@@ -66,7 +61,7 @@ module.exports = class Collection extends Requestable {
     /**
      * 
      */
-    add(model) {
+    add(model: Model) {
         this.models.push(model);
         model.addObserver(this);
     }

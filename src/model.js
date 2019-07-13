@@ -1,7 +1,6 @@
-const Data = require('./data.js');
+const Utils = require('./utils');
+const Data = require('./data');
 const Requestable = require('./requestable');
-const pluralize = require('pluralize');
-const _ = require('lodash');
 
 const {
     MODEL
@@ -39,7 +38,7 @@ module.exports = class Model extends Requestable {
      * The name will be used to generate the dafault routes for the model.
      */
     name() {
-        return pluralize(this.constructor.name.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-')).toLowerCase();
+        return Utils.classNameToApiRoute(this.constructor.name);
     }
 
     /**
@@ -55,14 +54,14 @@ module.exports = class Model extends Requestable {
     addObserver(observer) {
         if (typeof observer.notify !== 'function') throw "The observer has to implement the notify function.";
 
-        if (_.findIndex(this._observers, observer) < 0) this._observers.push(observer);
+        if (Utils.findIndex(this._observers, observer) < 0) this._observers.push(observer);
     }
 
     /**
      * Removes the observer that matches with the filter criteria from the list of observers.
      */
     removeObserver(filter) {
-        _.remove(this._observers, filter);
+        Utils.remove(this._observers, filter);
     }
 
     /**
@@ -93,6 +92,7 @@ module.exports = class Model extends Requestable {
     set values(values) {
         this._values.values = {
             ...this.defaults(),
+            ...this.values,
             ...values
         };
     }
@@ -107,6 +107,7 @@ module.exports = class Model extends Requestable {
     set syncValues(values) {
         this._syncValues.values = {
             ...this.defaults(),
+            ...this.syncValues,
             ...values
         };
     }
@@ -115,22 +116,14 @@ module.exports = class Model extends Requestable {
      * The values that have changed since the last call of the sync method.
      */
     get dirtyValues() {
-        function changes(object, base) {
-            return _.transform(object, function (result, value, key) {
-                if (!_.isEqual(value, base[key])) {
-                    result[key] = (_.isObject(value) && _.isObject(base[key])) ? changes(value, base[key]) : value;
-                }
-            });
-        }
-
-        return changes(this.values, this.syncValues);
+        return Utils.objectDiff(this.values, this.syncValues);
     }
 
     /**
      * Determines if the model's values has changed since the last call of sync method.
      */
     get dirty() {
-        return !_.isEqual(this.dirtyValues, {});
+        return !Utils.isEqual(this.dirtyValues, {});
     }
 
     /**

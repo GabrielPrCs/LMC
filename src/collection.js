@@ -1,7 +1,6 @@
+const Utils = require('./utils');
 const Data = require('./data.js');
 const Requestable = require('./requestable');
-const pluralize = require('pluralize');
-const _ = require('lodash');
 
 const {
     MODEL
@@ -41,7 +40,7 @@ module.exports = class Collection extends Requestable {
     }
 
     name() {
-        return pluralize(this.constructor.name).toLowerCase();
+        return Utils.classNameToApiRoute(this.constructor.name);
     }
 
     model() {
@@ -84,14 +83,14 @@ module.exports = class Collection extends Requestable {
      * 
      */
     findIndex(filter) {
-        return _.findIndex(this.models, filter);
+        return Utils.findIndex(this.models, filter);
     }
 
     /**
      * 
      */
     find(filter) {
-        return _.find(this.models, filter);
+        return Utils.find(this.models, filter);
     }
 
     /**
@@ -100,14 +99,14 @@ module.exports = class Collection extends Requestable {
     remove(id) {
         let filter = {};
         filter[this.model().key()] = id;
-        return _.remove(this.models, filter);
+        return Utils.remove(this.models, filter);
     }
 
     /**
      * 
      */
     filter(filter) {
-        return _.filter(this.models, filter);
+        return Utils.filter(this.models, filter);
     }
 
     /**

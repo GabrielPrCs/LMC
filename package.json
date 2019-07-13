@@ -10,6 +10,7 @@
   },
   "devDependencies": {},
   "scripts": {
+    "build": "browserify main.js -o ./dist/bundle.js",
     "test": "node ./tests.js"
   },
   "keywords": [

@@ -36,8 +36,8 @@ module.exports = class Collection extends Requestable {
         return this.filter(model => model.dirty);
     }
 
-    toPlainArray() {
-        return this.models.map(model => model.values);
+    plainJS() {
+        return this.models.map(model => model.plainJS());
     }
 
     name() {
@@ -122,13 +122,7 @@ module.exports = class Collection extends Requestable {
                 resolve(response);
             };
 
-            try {
-                this.requester('fetch', {
-                    params
-                }).then(success).catch(error => reject(error));
-            } catch (e) {
-                throw e;
-            }
+            this.request('fetch', params).then(success).catch(reject);
         });
     }
 };

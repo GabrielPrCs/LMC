@@ -4,7 +4,7 @@ module.exports = class Requestable {
     constructor() {
         this._loading = false;
     }
-    
+
     /**
      * The error code number returned when the validation of a request's parameters fails.
      */
@@ -17,9 +17,10 @@ module.exports = class Requestable {
      */
     defaultMethods() {
         return {
-            fetch: 'GET',
             save: 'POST',
-            update: 'PATCH',
+            fetch: 'GET',
+            patch: 'PATCH',
+            update: 'PUT',
             delete: 'DELETE'
         };
     }
@@ -63,7 +64,7 @@ module.exports = class Requestable {
     /**
      * 
      */
-    requester(action, extraConfig = {}) {
+    request(action, data = {}) {
         const routes = {
             ...this.defaultRoutes(),
             ...this.routes()
@@ -77,14 +78,20 @@ module.exports = class Requestable {
         if (!routes.hasOwnProperty(action)) throw `The route for the ${action} action does not exists.`;
         if (!methods.hasOwnProperty(action)) throw `The method for the ${action} action does not exists.`;
 
+        const method = methods[action];
+
+        const extraConfig = {};
+
+        if (['PUT', 'POST', 'PATCH'].includes(method)) extraConfig['data'] = data;
+        else extraConfig['params'] = data;
+
         const config = {
-            method: methods[action],
+            method,
             url: this.basePath() + routes[action],
             ...extraConfig
         };
 
         return new Promise((resolve, reject) => {
-
             const clear = x => this.loading = false;
 
             const success = response => {

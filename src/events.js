@@ -10,7 +10,12 @@ const COLLECTION = {
 
 };
 
+const PAGINATED_COLLECTION = {
+    
+};
+
 module.exports = {
     MODEL,
-    COLLECTION
+    COLLECTION,
+    PAGINATED_COLLECTION,
 };

@@ -66,6 +66,6 @@ export abstract class Utils {
      * 
      */
     static inArray(array, what): boolean {
-        return Utils.findIndex(array, what) < 0;
+        return Utils.findIndex(array, what) >= 0;
     }
 };

@@ -2,16 +2,7 @@ import * as assert from 'assert';
 import { Model } from './classes/model';
 import { Collection } from './classes/collection';
 import { PaginatedCollection } from './classes/paginated-collection';
-
-
-interface ServerResponseConfig {
-    data: string
-}
-
-interface ServerResponse {
-    data: object,
-    config: ServerResponseConfig
-}
+import { ServerResponse } from './interfaces/async-requests';
 
 class Todo extends Model {
 
@@ -142,6 +133,32 @@ async function modelTests() {
         assert.deepEqual(model.syncValues, model.values);
         assert.equal(model.values.id, 201);
     });
+
+    /**
+     * Adds a model to multiple collections.
+     */
+    let col1 = new Todos();
+    let col2 = new Todos();
+    let col3 = new Todos();
+
+    model.addTo([col1, col2, col3]);
+
+    assert.deepEqual(col1.models, [model]);
+    assert.deepEqual(col2.models, [model]);
+    assert.deepEqual(col3.models, [model]);
+
+    assert.equal(model.observedBy(col1), true);
+    assert.equal(model.observedBy(col2), true);
+    assert.equal(model.observedBy(col3), true);
+
+    /**
+     * Removes an observer from the model.
+     */
+    model.removeObserver(col1);
+
+    assert.equal(model.observedBy(col1), false);
+
+    assert.deepEqual(col1.models, [])
 }
 
 async function collectionTests() {
@@ -159,14 +176,14 @@ async function collectionTests() {
      */
     let todo1 = new Todo({ id: 1 });
 
-    todos.add(todo1);
+    todos.add([todo1]);
 
     assert.deepEqual(todos.models, [todo1]);
 
     /**
      * Implace a model in the collection.
      */
-    todos.implace({ id: 2 });
+    todos.implace([{ id: 2 }]);
 
     assert.deepEqual(todos.plainJS(), [todo1.values, {
         id: 2,
@@ -194,7 +211,7 @@ async function collectionTests() {
      */
     let todo2 = new Todo({ id: 2 });
 
-    let removed = todos.remove(32);
+    let removed = todos.remove({ id: 33 });
 
     assert.deepEqual(todos.plainJS(), [todo1.values, todo2.values]);
     assert.deepEqual(removed, []);
@@ -202,14 +219,14 @@ async function collectionTests() {
     /**
      * Remove an existing item.
      */
-    todos.remove(2);
+    todos.remove({ id: 2 });
 
     assert.deepEqual(todos.plainJS(), [todo1.values]);
 
     /**
      * Bind a model to a collection using the model's constructor.
      */
-    let todo3 = new Todo({ id: 3 }, todos);
+    let todo3 = new Todo({ id: 3 }, [todos]);
 
     assert.deepEqual(todos.plainJS(), [todo1.values, todo3.values]);
 
@@ -236,9 +253,7 @@ async function collectionTests() {
     await todo2.fetch();
     await todo3.fetch();
 
-    todos.add(todo1);
-    todos.add(todo2);
-    todos.add(todo3);
+    todos.add([todo1, todo2, todo3]);
 
     todo1.values.title = "Title changed";
 

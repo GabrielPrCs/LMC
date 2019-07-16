@@ -12,8 +12,13 @@
     "browserify": "^16.3.0"
   },
   "scripts": {
-    "build": "tsc && browserify ./dist/src/main.js -o ./dist/browserify/bundle.js",
-    "test": "tsc && node ./dist/src/tests.js"
+    "development": "tsc",
+    "dev": "npm run development",
+    "watch": "tsc -w",
+    "production": "tsc && browserify ./dist/src/main.js -o ./dist/browserify/bundle.js",
+    "prod": "npm run production",
+    "test": "node ./dist/src/tests.js",
+    "build-test": "npm run development && npm run test"
   },
   "keywords": [
     "laravel",

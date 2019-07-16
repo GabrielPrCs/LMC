@@ -1,130 +1,163 @@
 import { Utils } from './utils';
 import { Requestable } from './requestable';
-import { MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from '../interfaces/observable-events';
 import { Collection } from './collection';
-import { ObservableEvent, Observer, Observable } from '../interfaces/observer-observable';
+import { ObservableEvent, Observer, Observable, MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from '../interfaces/observer-observable';
 import { ModelValues } from '../interfaces/data-types';
+import { ServerResponse } from '../interfaces/async-requests';
 
 export abstract class Model extends Requestable implements Observable {
 
-    private _values: ModelValues;
-    private _syncValues: ModelValues;
+    private _values: ModelValues = {};
+    private _syncValues: ModelValues = {};
     private _deleted: boolean = false;
     private _observers: Array<Observer> = [];
 
-    constructor(values: ModelValues = {}, collection?: Collection) {
+    /**
+     * Creates a new instance of the model.
+     * 
+     * The initial status will be merged to the default values, **giving priority to the passed values over the default ones**.
+     * For this reason, is not necessary to pass the values of those properties that will have the default value. If no id
+     * is provided on the initial values, the model will considered as a new model that has not been persisted on backend yet (model.id === null).
+     *
+     * The model will be added to each one of the collections passed.
+     * 
+     * @param values the initial status of the model.
+     * @param collection an array of the collections to where the model has to be added.
+     */
+    constructor(values: ModelValues = {}, collections: Array<Collection> = []) {
         super();
 
         this.values = values;
 
-        this.syncValues = values;
+        this.sync();
 
-        if (collection) collection.add(this);
+        this.addTo(collections);
     }
 
     /**
+     * Determines if the given observer already exists on the array of observers.
      * 
+     * @param observer  the observer to check if is present.
+     * @return true if the observer is present, false otherwise.
      */
-    plainJS() {
-        return this.values;
+    observedBy(observer: Observer): boolean {
+        return Utils.inArray(this._observers, observer);
     }
 
     /**
-     * Adds an observer that will be notified when an event is fired.
+     * Adds an observer that will be notified when an event is fired. When an observer is notified,
+     * the notify function will be called with the event that is beeing fired and the instance of the model
+     * that fired the event.
+     * 
+     * If the observer already exists in the array of observers, then does nothing.
+     * 
+     * @param observer the observer to be added to the array of observers.
+     * @returns true if the observer has been added to the array, false if the observer already was in the array of observers.
      */
-    addObserver(observer: Observer) {
-        if (Utils.inArray(this._observers, observer)) this._observers.push(observer);
+    addObserver(observer: Observer): boolean {
+        let added = false;
+
+        if (!this.observedBy(observer)) {
+            this._observers.push(observer);
+            added = true;
+        }
+
+        return added;
     }
 
     /**
-     * Removes the observer that matches with the filter criteria from the list of observers.
+     * Removes the given observer from the array of observers. If the observer was not in the array, then does nothing.
+     * 
+     * If the observer is as collection, also removes the model from the collection.
+     * 
+     * @param observer the observer to be removed from the list of observers.
+     * @returns true if the observer was in the array of observers and was removed, false if the observer was not in the array.
      */
-    removeObserver(observer: Observer) {
-        Utils.remove(this._observers, observer);
+    removeObserver(observer: Observer): boolean {
+        /**
+         * As Collection.remove(Model) also calls Model.removeObserver(Collection), 
+         * we need tocheck if the collection is still observing the model to avoid a deadlock.
+         */
+        let removed = false;
+
+        if (this.observedBy(observer)) {
+            Utils.remove(this._observers, observer);
+
+            if (observer instanceof Collection) observer.remove(this.values);
+
+            removed = true;
+        }
+
+        return removed;
     }
 
     /**
-     * Notifies to each observer that a event has happened.
+     * Notifies to each observer that an event has happened. Sends the event and the model that has fired the event
+     * to the observer.
+     * 
+     * @param event the event to notify.
      */
-    fire(event: ObservableEvent) {
+    fire(event: ObservableEvent): void {
         this._observers.forEach(observer => observer.notify(event, this));
     }
 
     /**
-     * Determines if the model has been successfully deleted from the backend.
+     * The defaults values for each one of the model properties.
+     * 
+     * @returns an ModelValues object with the status of a model that does not exists on backend yet.
      */
-    get deleted() {
-        return this._deleted;
-    }
-
-    set deleted(value) {
-        this._deleted = value;
+    defaults(): ModelValues {
+        return { id: null };
     }
 
     /**
      * The current status of the model.
      */
-    get values() {
+    get values(): ModelValues {
         return this._values;
     }
 
-    set values(values) {
+    set values(values: ModelValues) {
         this._values = { ...this.defaults(), ...this.values, ...values };
     }
 
     /**
      * The last synchronized status of the model.
      */
-    get syncValues() {
+    get syncValues(): ModelValues {
         return this._syncValues;
-    }
-
-    set syncValues(values) {
-        this._syncValues = { ...this.defaults(), ...this.syncValues, ...values };
     }
 
     /**
      * The values that have changed since the last call of the sync method.
      */
-    get dirtyValues() {
+    get dirtyValues(): ModelValues {
         return Utils.objectDiff(this.values, this.syncValues);
     }
 
     /**
      * Determines if the model's values has changed since the last call of sync method.
      */
-    get dirty() {
+    get dirty(): boolean {
         return !Utils.isEqual(this.dirtyValues, {});
     }
 
     /**
-     * Determines which property of the model's values will be used as the primary key.
+     * Determines if the model has been successfully deleted from the backend.
      */
-    static key() {
-        return 'id';
+    get deleted(): boolean {
+        return this._deleted;
+    }
+
+    set deleted(value: boolean) {
+        this._deleted = value;
     }
 
     /**
-     * 
+     * Generates an unique id for the model using its values.
      */
-    get id() {
-        return this.values[Model.key()];
-    }
-
-    /**
-     * 
-     */
-    set id(value) {
-        this.values[Model.key()] = value;
-    }
-
-    /**
-     * The defaults values for each one of the model properties.
-     */
-    defaults(): ModelValues {
-        return {
-            id: null
-        };
+    key(): any {
+        return this.values.id;
     }
 
     /**
@@ -133,24 +166,24 @@ export abstract class Model extends Requestable implements Observable {
     protected defaultRoutes() {
         return {
             save: `/${this.name()}`,
-            fetch: `/${this.name()}/${this.id}`,
-            patch: `/${this.name()}/${this.id}`,
-            update: `/${this.name()}/${this.id}`,
-            delete: `/${this.name()}/${this.id}`
+            fetch: `/${this.name()}/${this.key()}`,
+            patch: `/${this.name()}/${this.key()}`,
+            update: `/${this.name()}/${this.key()}`,
+            delete: `/${this.name()}/${this.key()}`
         };
     }
 
     /**
      * Determines if the update request will be performed using PUT or PATCH.
      */
-    patchUpdates() {
+    patchUpdates(): boolean {
         return false;
     }
 
     /**
      * Returns the model's values object to the last sync status. The current values object is lost.
      */
-    rollback() {
+    rollback(): void {
         this.values = this.syncValues;
         this.fire(MODEL_ROLLBACK);
     }
@@ -158,24 +191,34 @@ export abstract class Model extends Requestable implements Observable {
     /**
      * Sets the sync object to the current model's values object. The previous sync status is lost.
      */
-    sync() {
-        this.syncValues = this.values;
+    sync(): void {
+        this._syncValues = { ...this.defaults(), ...this.syncValues, ...this.values };
         this.fire(MODEL_SYNC);
     }
 
     /**
      * Sets the model's values object to it's defaults values.
      */
-    clear() {
+    clear(): void {
         this.values = this.defaults(); // As defaults() returns a new object each time, we don't need to use { ...this.defaults() }.
     }
 
     /**
-     * Fires the MODEL_FETCHED event on success.
+     * Adds the model to one or more collections. This will have the same result than calling collection.add(model) in each
+     * one of the collections.
+     * 
+     * @param collections an array with the collection to where add the model.
+     */
+    addTo(collections: Array<Collection>): void {
+        collections.forEach(collection => collection.add([this]));
+    }
+
+    /**
+     * Fires the **MODEL_FETCHED** event on success.
      */
     async fetch() {
         return new Promise((resolve, reject) => {
-            const success = response => {
+            const success = (response: ServerResponse) => {
                 this.values = response.data;
 
                 this.sync();
@@ -190,16 +233,15 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     /**
-     * Fires the MODEL_SAVED event on success.
+     * Saves the current status of the model on the backend. If the model has an id the performs an update. Otherwise, performs a create. 
+     * If an update is performed, uses the PUT or PATCH method following the definition of model.patchUpdates.
+     * 
+     * Fires the **MODEL_SAVED** event on success.
      */
     async save() {
         return new Promise((resolve, reject) => {
-            const success = response => {
-                /**
-                 * If the response changes the id of the object for some reason, then updates it.
-                 * This should only happen when the model is saved for the first time on the server.
-                 */
-                if (this.id != response.data[Model.key()]) this.id = response.data[Model.key()];
+            const success = (response: ServerResponse) => {
+                this.values = response.data;
 
                 this.deleted = false;
 
@@ -222,11 +264,11 @@ export abstract class Model extends Requestable implements Observable {
      * Deletes the model from the backend. The values of the model are not changed, so they can still be accessed.
      * If the backend uses soft deletion, this values (including the id) can be used to restore the data.
      * 
-     * Fires the MODEL_DELETED event on success.
+     * Fires the **MODEL_DELETED** event on success.
      */
     async delete() {
         return new Promise((resolve, reject) => {
-            const success = response => {
+            const success = (response: ServerResponse) => {
                 this.deleted = true;
                 this.fire(MODEL_DELETED);
                 resolve(response);

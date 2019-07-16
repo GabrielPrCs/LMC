@@ -1,8 +1,7 @@
 import { Utils } from './utils';
 import { Requestable } from './requestable';
 import { Model } from './model';
-import { MODEL_DELETED } from '../interfaces/observable-events';
-import { ObservableEvent, Observer } from '../interfaces/observer-observable';
+import { ObservableEvent, Observer, MODEL_DELETED } from '../interfaces/observer-observable';
 import { ModelValues } from '../interfaces/data-types';
 
 export abstract class Collection extends Requestable implements Observer {
@@ -11,14 +10,14 @@ export abstract class Collection extends Requestable implements Observer {
     constructor(models: Array<Model> = []) {
         super();
 
-        models.forEach(item => this.implace(item));
+        this.add(models);
     }
 
     notify(event: ObservableEvent, model: Model) {
         switch (event) {
             case MODEL_DELETED:
                 model.removeObserver(this);
-                this.remove(model.values[this.model().key()]);
+                this.remove(model.values);
                 break;
         }
     }
@@ -32,11 +31,11 @@ export abstract class Collection extends Requestable implements Observer {
     }
 
     get dirtyModels(): Array<Model> {
-        return this.filter((model: Model) => model.dirty);
+        return Utils.filter(this.models, { dirty: true });
     }
 
     plainJS() {
-        return this.models.map(model => model.plainJS());
+        return this.models.map(model => model.values);
     }
 
     abstract model();
@@ -60,47 +59,50 @@ export abstract class Collection extends Requestable implements Observer {
     /**
      * 
      */
-    add(model: Model) {
-        this.models.push(model);
-        model.addObserver(this);
+    add(models: Array<Model>) {
+        models.forEach(model => {
+            this.models.push(model);
+            model.addObserver(this);
+        });
     }
 
     /**
      * 
      */
-    implace(values: ModelValues) {
-        let TModel = this.model();
-        this.add(new TModel(values));
+    implace(models: Array<ModelValues>) {
+        this.add(models.map(model => {
+            let TModel = this.model();
+            return new TModel(model);
+        }));
     }
 
     /**
      * 
      */
-    findIndex(filter) {
-        return Utils.findIndex(this.models, filter);
+    findIndex(values: ModelValues) {
+        return Utils.findIndex(this.models, { values });
     }
 
     /**
      * 
      */
-    find(filter) {
-        return Utils.find(this.models, filter);
+    find(values: ModelValues) {
+        return Utils.find(this.models, { values });
     }
 
     /**
      * 
      */
-    remove(id) {
-        let filter = {};
-        filter[this.model().key()] = id;
-        return Utils.remove(this.models, filter);
+    remove(values: ModelValues) {
+        // #TODO check if the model still is in the collection to avoid deadlocks.
+        return Utils.remove(this.models, { values });
     }
 
     /**
      * 
      */
-    filter(filter): Array<Model> {
-        return Utils.filter(this.models, filter);
+    filter(values: ModelValues): Array<Model> {
+        return Utils.filter(this.models, { values });
     }
 
     /**
@@ -111,7 +113,7 @@ export abstract class Collection extends Requestable implements Observer {
 
             const success = response => {
                 this.clear();
-                response.data.forEach(item => this.implace(item));
+                this.implace(response.data);
                 resolve(response);
             };
 

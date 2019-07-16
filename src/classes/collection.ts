@@ -5,14 +5,31 @@ import { ObservableEvent, Observer, MODEL_DELETED } from '../interfaces/observer
 import { ModelValues } from '../interfaces/data-types';
 
 export abstract class Collection extends Requestable implements Observer {
+    
     private _models: Array<Model> = [];
 
+    /**
+     * 
+     * @param models 
+     */
     constructor(models: Array<Model> = []) {
         super();
 
         this.add(models);
     }
 
+    /**
+     * 
+     */
+    toArray(): Array<ModelValues> {
+        return this.models.map(model => model.values);
+    }
+
+    /**
+     * 
+     * @param event 
+     * @param model 
+     */
     notify(event: ObservableEvent, model: Model) {
         switch (event) {
             case MODEL_DELETED:
@@ -22,6 +39,9 @@ export abstract class Collection extends Requestable implements Observer {
         }
     }
 
+    /**
+     * An array with all the models that are in the collection at the moment.
+     */
     get models(): Array<Model> {
         return this._models;
     }
@@ -30,14 +50,16 @@ export abstract class Collection extends Requestable implements Observer {
         this._models = [...models];
     }
 
+    /**
+     * 
+     */
     get dirtyModels(): Array<Model> {
         return Utils.filter(this.models, { dirty: true });
     }
 
-    plainJS() {
-        return this.models.map(model => model.values);
-    }
-
+    /**
+     * 
+     */
     abstract model();
 
     /**
@@ -50,30 +72,43 @@ export abstract class Collection extends Requestable implements Observer {
     }
 
     /**
+     * **[Chainable]**
      * 
+     * @returns the instance of the model for method chaining.
      */
-    clear() {
+    clear(): this {
         this.models = [];
+        return this;
     }
 
     /**
+     * **[Chainable]**
      * 
+     * @param mod the model or an array of models to add to the collection.
+     * @returns the instance of the model for method chaining.
      */
-    add(models: Array<Model>) {
-        models.forEach(model => {
+    add(mod: Model | Array<Model>): this {
+        const handler = (model: Model) => {
             this.models.push(model);
             model.addObserver(this);
-        });
+        };
+
+        if(mod instanceof Model) handler(mod);
+        else mod.forEach(model => handler(model));
+
+        return this;
     }
 
     /**
+     * **[Chainable]**
      * 
+     * @param mod the model or an array of models to remove from the collection.
+     * @returns the instance of the model for method chaining.
      */
-    implace(models: Array<ModelValues>) {
-        this.add(models.map(model => {
-            let TModel = this.model();
-            return new TModel(model);
-        }));
+    remove(values: ModelValues): this {
+        // #TODO check if the model still is in the collection to avoid deadlocks.
+        Utils.remove(this.models, { values });
+        return this;
     }
 
     /**
@@ -93,9 +128,8 @@ export abstract class Collection extends Requestable implements Observer {
     /**
      * 
      */
-    remove(values: ModelValues) {
-        // #TODO check if the model still is in the collection to avoid deadlocks.
-        return Utils.remove(this.models, { values });
+    contains(model: Model): boolean {
+        return this.findIndex(model.values) >= 0;
     }
 
     /**
@@ -113,7 +147,8 @@ export abstract class Collection extends Requestable implements Observer {
 
             const success = response => {
                 this.clear();
-                this.implace(response.data);
+                let TModel = this.model();
+                this.add(response.data.map(model => new TModel(model)));
                 resolve(response);
             };
 

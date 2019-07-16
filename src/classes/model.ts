@@ -4,6 +4,7 @@ import { Collection } from './collection';
 import { ObservableEvent, Observer, Observable, MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from '../interfaces/observer-observable';
 import { ModelValues } from '../interfaces/data-types';
 import { ServerResponse } from '../interfaces/async-requests';
+import { HttpRoutes } from '../interfaces/data-types';
 
 export abstract class Model extends Requestable implements Observable {
 
@@ -83,7 +84,7 @@ export abstract class Model extends Requestable implements Observable {
         if (this.observedBy(observer)) {
             Utils.remove(this._observers, observer);
 
-            if (observer instanceof Collection) observer.remove(this.values);
+            if (observer instanceof Collection) this.removeFrom(observer);
 
             removed = true;
         }
@@ -107,7 +108,7 @@ export abstract class Model extends Requestable implements Observable {
      * @returns an ModelValues object with the status of a model that does not exists on backend yet.
      */
     defaults(): ModelValues {
-        return { id: null };
+        return {};
     }
 
     /**
@@ -149,10 +150,6 @@ export abstract class Model extends Requestable implements Observable {
         return this._deleted;
     }
 
-    set deleted(value: boolean) {
-        this._deleted = value;
-    }
-
     /**
      * Generates an unique id for the model using its values.
      */
@@ -163,14 +160,33 @@ export abstract class Model extends Requestable implements Observable {
     /**
      * 
      */
-    protected defaultRoutes() {
+    protected defaultRoutes(): HttpRoutes {
         return {
-            save: `/${this.name()}`,
-            fetch: `/${this.name()}/${this.key()}`,
-            patch: `/${this.name()}/${this.key()}`,
-            update: `/${this.name()}/${this.key()}`,
-            delete: `/${this.name()}/${this.key()}`
+            save: '/{name}',
+            fetch: '/{name}/{key}',
+            patch: '/{name}/{key}',
+            update: '/{name}/{key}',
+            delete: '/{name}/{key}'
         };
+    }
+
+    /**
+     * Given a set of routes, does the following replacements:
+     * 
+     * {key}  --> this.key()
+     * {name} --> this.name()
+     * 
+     * @param routes the object that contains the routes to give format.
+     */
+    protected routesFormater(routes: HttpRoutes): HttpRoutes {
+        let forRoutes = routes;
+
+        for (var key in routes)
+            if (routes.hasOwnProperty(key))
+                forRoutes[key] = routes[key].replace('{name}', this.name())
+                                            .replace('{key}', this.key());
+
+        return forRoutes;
     }
 
     /**
@@ -181,36 +197,70 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     /**
+     * **[Chainable]**
      * Returns the model's values object to the last sync status. The current values object is lost.
+     * 
+     * @returns the instance of the model for method chaining.
      */
-    rollback(): void {
+    rollback(): this {
         this.values = this.syncValues;
         this.fire(MODEL_ROLLBACK);
+        return this;
     }
 
     /**
+     * **[Chainable]**
      * Sets the sync object to the current model's values object. The previous sync status is lost.
+     * 
+     * @returns the instance of the model for method chaining.
      */
-    sync(): void {
+    sync(): this {
         this._syncValues = { ...this.defaults(), ...this.syncValues, ...this.values };
         this.fire(MODEL_SYNC);
+        return this;
     }
 
     /**
+     * **[Chainable]**
      * Sets the model's values object to it's defaults values.
+     * 
+     * @returns the instance of the model for method chaining.
      */
-    clear(): void {
+    clear(): this {
         this.values = this.defaults(); // As defaults() returns a new object each time, we don't need to use { ...this.defaults() }.
+        return this;        
     }
 
     /**
-     * Adds the model to one or more collections. This will have the same result than calling collection.add(model) in each
+     * **[Chainable]**
+     * Adds the model to one or more collections. This will have the same result than calling collection.add(model) on each
      * one of the collections.
      * 
-     * @param collections an array with the collection to where add the model.
+     * @param col the collection or an array with the collections to where add the model.
+     * @returns the instance of the model for method chaining.
      */
-    addTo(collections: Array<Collection>): void {
-        collections.forEach(collection => collection.add([this]));
+    addTo(col: Collection | Array<Collection>): this {
+        if(col instanceof Collection) col.add(this);
+        else col.forEach(collection => collection.add(this));
+        return this;
+    }
+
+    /**
+     * **[Chainable]**
+     * Removes the model from one or more collections. This will have the same result than calling collection.remove(model) on each
+     * one of the collections.
+     * 
+     * @param col the collection or an array with the collections from where remove the model.
+     * @returns the instance of the model for method chaining.
+     */
+    removeFrom(col: Collection | Array<Collection>): this {
+        const handler = (collection: Collection) => {
+            if(collection.contains(this)) collection.remove(this.values);
+        };
+
+        if(col instanceof Collection) handler(col);
+        else col.forEach(collection => handler(collection));
+        return this;
     }
 
     /**
@@ -234,7 +284,7 @@ export abstract class Model extends Requestable implements Observable {
 
     /**
      * Saves the current status of the model on the backend. If the model has an id the performs an update. Otherwise, performs a create. 
-     * If an update is performed, uses the PUT or PATCH method following the definition of model.patchUpdates.
+     * If an update is performed, uses the PUT or PATCH method following the definition of Model.patchUpdates method.
      * 
      * Fires the **MODEL_SAVED** event on success.
      */
@@ -243,7 +293,7 @@ export abstract class Model extends Requestable implements Observable {
             const success = (response: ServerResponse) => {
                 this.values = response.data;
 
-                this.deleted = false;
+                this._deleted = false;
 
                 this.sync();
 
@@ -269,7 +319,7 @@ export abstract class Model extends Requestable implements Observable {
     async delete() {
         return new Promise((resolve, reject) => {
             const success = (response: ServerResponse) => {
-                this.deleted = true;
+                this._deleted = true;
                 this.fire(MODEL_DELETED);
                 resolve(response);
             };

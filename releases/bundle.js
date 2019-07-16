@@ -86,7 +86,7 @@ var Collection = /** @class */ (function (_super) {
         enumerable: true,
         configurable: true
     });
-    Collection.prototype.plainJS = function () {
+    Collection.prototype.toArray = function () {
         return this.models.map(function (model) { return model.values; });
     };
     /**

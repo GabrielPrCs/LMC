@@ -1,7 +1,7 @@
 
 
 export interface HttpRoutes {
-    
+    [key: string]: string
 }
 
 export type HttpError = number;
@@ -12,7 +12,6 @@ export interface HttpMethods {
 }
 
 export interface ModelValues {
-    id?: number,
     [key: string]: any
 };
 

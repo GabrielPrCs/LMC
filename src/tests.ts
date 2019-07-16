@@ -141,13 +141,16 @@ async function modelTests() {
     let col2 = new Todos();
     let col3 = new Todos();
 
-    model.addTo([col1, col2, col3]);
+    model.addTo(col1);
 
     assert.deepEqual(col1.models, [model]);
+    assert.equal(model.observedBy(col1), true);
+
+    model.addTo([col2, col3]);
+
     assert.deepEqual(col2.models, [model]);
     assert.deepEqual(col3.models, [model]);
 
-    assert.equal(model.observedBy(col1), true);
     assert.equal(model.observedBy(col2), true);
     assert.equal(model.observedBy(col3), true);
 
@@ -158,14 +161,28 @@ async function modelTests() {
 
     assert.equal(model.observedBy(col1), false);
 
-    assert.deepEqual(col1.models, [])
+    assert.deepEqual(col1.models, []);
+
+    /**
+     * Methods chaining.
+     */
+    model = new Todo({ id: 1 });
+    let todos = new Todos();
+
+    await model.fetch();
+
+    model.values.title = "Testing chaining";
+    model.sync().addTo(todos).rollback();
+
+    assert.equal(model.values.title, "Testing chaining");
+    assert.equal(model.observedBy(todos), true);
 }
 
 async function collectionTests() {
 
     let todos = new Todos();
 
-    await todos.fetch().then((response: ServerResponse) => assert.deepEqual(todos.plainJS(), response.data));
+    await todos.fetch().then((response: ServerResponse) => assert.deepEqual(todos.toArray(), response.data));
 
     todos.clear();
 
@@ -183,9 +200,9 @@ async function collectionTests() {
     /**
      * Implace a model in the collection.
      */
-    todos.implace([{ id: 2 }]);
+    todos.add(new Todo({ id: 2 }));
 
-    assert.deepEqual(todos.plainJS(), [todo1.values, {
+    assert.deepEqual(todos.toArray(), [todo1.values, {
         id: 2,
         userId: null,
         title: '',
@@ -211,31 +228,30 @@ async function collectionTests() {
      */
     let todo2 = new Todo({ id: 2 });
 
-    let removed = todos.remove({ id: 33 });
+    todos.remove({ id: 33 });
 
-    assert.deepEqual(todos.plainJS(), [todo1.values, todo2.values]);
-    assert.deepEqual(removed, []);
+    assert.deepEqual(todos.toArray(), [todo1.values, todo2.values]);
 
     /**
      * Remove an existing item.
      */
     todos.remove({ id: 2 });
 
-    assert.deepEqual(todos.plainJS(), [todo1.values]);
+    assert.deepEqual(todos.toArray(), [todo1.values]);
 
     /**
      * Bind a model to a collection using the model's constructor.
      */
     let todo3 = new Todo({ id: 3 }, [todos]);
 
-    assert.deepEqual(todos.plainJS(), [todo1.values, todo3.values]);
+    assert.deepEqual(todos.toArray(), [todo1.values, todo3.values]);
 
     /**
      * Removing a model from a collection deleting the model itself.
      */
     await todo3.delete();
 
-    assert.deepEqual(todos.plainJS(), [todo1.values]);
+    assert.deepEqual(todos.toArray(), [todo1.values]);
 
     /**
      * Fetching a list with a filter applied.
@@ -262,6 +278,22 @@ async function collectionTests() {
     todo1.sync();
 
     assert.deepEqual(todos.dirtyModels, []);
+
+    /**
+     * Removing a model from a collection.
+     */
+    assert.deepEqual(todos.models, [todo1, todo2, todo3]);
+
+    todo1.removeFrom([todos]);
+
+    assert.deepEqual(todos.models, [todo2, todo3]);
+
+    /**
+     * Methods chaining.
+     */
+    todos.clear().add([todo1, todo3]).remove(todo1.values);
+
+    assert.deepEqual(todos.models, [todo3]);
 }
 
 async function paginatedCollectionTests() {
@@ -520,29 +552,29 @@ async function paginatedCollectionTests() {
      * Fetching the current page (1).
      */
     let todos = new PaginatedTodos();
-    await todos.fetch().then(_ => assert.deepEqual(todos.plainJS(), page1));
+    await todos.fetch().then(_ => assert.deepEqual(todos.toArray(), page1));
 
     /**
      * Fetching the next page.
      */
-    await todos.nextPage().then(_ => assert.deepEqual(todos.plainJS(), page2));
+    await todos.nextPage().then(_ => assert.deepEqual(todos.toArray(), page2));
 
     /**
      * Fetching the previous page.
      */
-    await todos.previousPage().then(_ => assert.deepEqual(todos.plainJS(), page1));
+    await todos.previousPage().then(_ => assert.deepEqual(todos.toArray(), page1));
 
     /**
      * Fetching a specific page.
      */
-    await todos.goToPage(5).then(_ => assert.deepEqual(todos.plainJS(), page5));
+    await todos.goToPage(5).then(_ => assert.deepEqual(todos.toArray(), page5));
 
     /**
      * Fetching the first page for the todos of user with id 3.
      */
     const filter = { userId: 3 };
 
-    await todos.goToPage(1, filter).then(_ => assert.deepEqual(todos.plainJS(), page1UID3));
+    await todos.goToPage(1, filter).then(_ => assert.deepEqual(todos.toArray(), page1UID3));
 }
 
 async function run() {

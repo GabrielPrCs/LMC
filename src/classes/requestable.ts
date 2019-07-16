@@ -58,6 +58,14 @@ export abstract class Requestable {
     }
 
     /**
+     * 
+     * @param routes 
+     */
+    protected routesFormater(routes: HttpRoutes): HttpRoutes {
+        return routes;
+    }
+
+    /**
      * The routes for this model. If not is overridden, then returns the defaults.
      */
     routes(): HttpRoutes {
@@ -76,7 +84,7 @@ export abstract class Requestable {
      * 
      */
     request(action, data = {}) {
-        const routes = { ...this.defaultRoutes(), ...this.routes() };
+        const routes = this.routesFormater({ ...this.defaultRoutes(), ...this.routes() });
 
         const methods = { ...this.defaultMethods(), ...this.methods() };
 

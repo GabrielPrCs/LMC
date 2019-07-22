@@ -1,12 +1,4 @@
-export interface ClientRequest {
+import { AxiosResponse, AxiosError } from "axios";
 
-}
-
-export interface ServerResponseConfig {
-    data: string
-}
-
-export interface ServerResponse {
-    data: object,
-    config: ServerResponseConfig
-}
+export type SuccessResponse = AxiosResponse;
+export type ErrorResponse = AxiosError;

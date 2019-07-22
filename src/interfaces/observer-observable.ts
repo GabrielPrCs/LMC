@@ -2,9 +2,9 @@ export type ObservableEvent = number;
 
 export interface Observable {
     fire: (event: ObservableEvent) => void,
-    addObserver: (observer: Observer) => boolean,
+    addObserver: (observer: Observer) => this,
     observedBy: (observer: Observer) => boolean,
-    removeObserver: (observer: Observer) => boolean;
+    removeObserver: (observer: Observer) => this;
 }
 
 export interface Observer {

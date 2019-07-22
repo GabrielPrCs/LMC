@@ -3,7 +3,12 @@ import * as pluralize from 'pluralize';
 
 export abstract class Utils {
     /**
+     * Given two objects, returns a new object with the attributes that are different between them both.
+     * Does a deep comparison.
      * 
+     * @param object1
+     * @param object2
+     * @returns
      */
     static objectDiff(object, base) {
         return _.transform(object, function (result, value, key) {
@@ -11,6 +16,13 @@ export abstract class Utils {
                 result[key] = (_.isObject(value) && _.isObject(base[key])) ? Utils.objectDiff(value, base[key]) : value;
             }
         });
+    }
+
+    /**
+     * 
+     */
+    static sort(array, what) {
+        return _.sortBy(array, what);
     }
 
     /**

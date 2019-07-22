@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Utils } from './utils';
 import { HttpError, HttpRoutes, HttpMethods } from '../interfaces/data-types';
+import { SuccessResponse, ErrorResponse } from '../interfaces/async-requests';
 
 export abstract class Requestable {
     private _loading: boolean;
@@ -8,7 +9,7 @@ export abstract class Requestable {
     constructor() {
         this._loading = false;
     }
-    
+
     /**
      * A string to be concatened at the beginning of each route.
      */
@@ -66,6 +67,20 @@ export abstract class Requestable {
     }
 
     /**
+     * 
+     */
+    protected successInterceptor(action: string, response: SuccessResponse): SuccessResponse {
+        return response;
+    }
+
+    /**
+     * 
+     */
+    protected errorInterceptor(action: string, error: ErrorResponse): ErrorResponse {
+        return error;
+    }
+
+    /**
      * The routes for this model. If not is overridden, then returns the defaults.
      */
     routes(): HttpRoutes {
@@ -83,43 +98,37 @@ export abstract class Requestable {
     /**
      * 
      */
-    request(action, data = {}) {
-        const routes = this.routesFormater({ ...this.defaultRoutes(), ...this.routes() });
-
-        const methods = { ...this.defaultMethods(), ...this.methods() };
+    request(action: string, data = {}) {
+        const routes: HttpRoutes = this.routesFormater({ ...this.defaultRoutes(), ...this.routes() });
+        const methods: HttpMethods = { ...this.defaultMethods(), ...this.methods() };
 
         if (!routes.hasOwnProperty(action)) throw `The route for the ${action} action does not exists.`;
         if (!methods.hasOwnProperty(action)) throw `The method for the ${action} action does not exists.`;
 
         const method = methods[action];
-
+        const url = this.basePath() + routes[action];
         const extraConfig = {};
 
         if (['PUT', 'POST', 'PATCH'].includes(method)) extraConfig['data'] = data;
         else extraConfig['params'] = data;
 
-        const config = {
-            method,
-            url: this.basePath() + routes[action],
-            ...extraConfig
-        };
-
+        // Performs the request and return a promise to handle the responses.
         return new Promise((resolve, reject) => {
             const clear = () => this.loading = false;
 
-            const success = response => {
+            const success = (response: SuccessResponse) => {
                 clear();
-                resolve(response);
+                resolve(this.successInterceptor(action, response));
             };
 
-            const error = error => {
+            const error = (error: ErrorResponse) => {
                 clear();
-                reject(error);
+                reject(this.errorInterceptor(action, error));
             };
 
             this.loading = true;
 
-            axios(config).then(success).catch(error);
+            axios({ method, url, ...extraConfig }).then(success).catch(error);
         });
     }
 }

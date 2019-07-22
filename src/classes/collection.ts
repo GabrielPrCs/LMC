@@ -5,14 +5,14 @@ import { ObservableEvent, Observer, MODEL_DELETED } from '../interfaces/observer
 import { ModelValues } from '../interfaces/data-types';
 
 export abstract class Collection extends Requestable implements Observer {
-    
+
     private _models: Array<Model> = [];
 
     /**
      * 
      * @param models 
      */
-    constructor(models: Array<Model> = []) {
+    constructor(models: Array<Model | ModelValues> = []) {
         super();
 
         this.add(models);
@@ -33,8 +33,7 @@ export abstract class Collection extends Requestable implements Observer {
     notify(event: ObservableEvent, model: Model) {
         switch (event) {
             case MODEL_DELETED:
-                model.removeObserver(this);
-                this.remove(model.values);
+                this.remove(model);
                 break;
         }
     }
@@ -44,10 +43,6 @@ export abstract class Collection extends Requestable implements Observer {
      */
     get models(): Array<Model> {
         return this._models;
-    }
-
-    set models(models: Array<Model>) {
-        this._models = [...models];
     }
 
     /**
@@ -77,24 +72,24 @@ export abstract class Collection extends Requestable implements Observer {
      * @returns the instance of the model for method chaining.
      */
     clear(): this {
-        this.models = [];
+        this._models = [];
         return this;
     }
 
     /**
      * **[Chainable]**
      * 
-     * @param mod the model or an array of models to add to the collection.
-     * @returns the instance of the model for method chaining.
      */
-    add(mod: Model | Array<Model>): this {
-        const handler = (model: Model) => {
-            this.models.push(model);
-            model.addObserver(this);
+    add(model: Model | ModelValues | Array<Model> | Array<ModelValues>): this {
+        const handler = (_model: Model) => {
+            this.models.push(_model);
+            _model.addObserver(this);
         };
 
-        if(mod instanceof Model) handler(mod);
-        else mod.forEach(model => handler(model));
+        const _Model = this.model();
+
+        if (model instanceof Array) model.forEach(mod => handler(mod instanceof Model ? mod : new _Model(mod)));
+        else handler(model instanceof Model ? model : new _Model(model));
 
         return this;
     }
@@ -105,38 +100,56 @@ export abstract class Collection extends Requestable implements Observer {
      * @param mod the model or an array of models to remove from the collection.
      * @returns the instance of the model for method chaining.
      */
-    remove(values: ModelValues): this {
-        // #TODO check if the model still is in the collection to avoid deadlocks.
-        Utils.remove(this.models, { values });
+    remove(filter: Model | ModelValues | Array<Model> | Array<ModelValues>): this {
+        const handler = (model: Model | ModelValues) => {
+            // Removes all every model that machs with the filter.
+            let removed: Array<Model> = Utils.remove(this.models, { values: model instanceof Model ? model.values : model });
+            // Removes the collection from the observers of each model removed.
+            removed.forEach((rem: Model) => rem.removeObserver(this));
+        };
+
+        if (filter instanceof Array) filter.forEach(mod => handler(mod));
+        else handler(filter);
+
         return this;
     }
 
     /**
      * 
+     * @param model
      */
-    findIndex(values: ModelValues) {
-        return Utils.findIndex(this.models, { values });
+    contains(model: Model | ModelValues): boolean {
+        return this.findIndex(model) >= 0;
     }
 
     /**
      * 
      */
-    find(values: ModelValues) {
-        return Utils.find(this.models, { values });
+    filter(model: Model | ModelValues): Array<Model> {
+        return Utils.filter(this.models, { values: model instanceof Model ? model.values : model });
     }
 
     /**
      * 
      */
-    contains(model: Model): boolean {
-        return this.findIndex(model.values) >= 0;
+    findIndex(model: Model | ModelValues): number {
+        return Utils.findIndex(this.models, { values: model instanceof Model ? model.values : model });
     }
 
     /**
      * 
      */
-    filter(values: ModelValues): Array<Model> {
-        return Utils.filter(this.models, { values });
+    find(model: Model | ModelValues): Model {
+        return Utils.find(this.models, { values: model instanceof Model ? model.values : model });
+    }
+
+    /**
+     * 
+     */
+    sort(by: string | Array<string>, desc: boolean = false): this {
+        this._models = Utils.sort(this.models, by instanceof Array ? by.map(item => 'values.' + item) : ['values.' + by]);
+        if (desc) this.models.reverse();
+        return this;
     }
 
     /**

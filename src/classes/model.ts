@@ -2,7 +2,7 @@ import { Utils } from './utils';
 import { Requestable } from './requestable';
 import { Collection } from './collection';
 import { ObservableEvent, Observer, Observable, MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from '../interfaces/observer-observable';
-import { ModelValues } from '../interfaces/data-types';
+import { ModelValue, ModelValues } from '../interfaces/data-types';
 import { SuccessResponse, ErrorResponse } from '../interfaces/async-requests';
 import { HttpRoutes } from '../interfaces/data-types';
 
@@ -30,6 +30,8 @@ export abstract class Model extends Requestable implements Observable {
         super();
 
         this.values = values;
+
+        this.validationErrors = {};
 
         this.sync();
 
@@ -81,7 +83,40 @@ export abstract class Model extends Requestable implements Observable {
     get validationErrors() {
         return this._validationErrors;
     }
-    
+
+    set validationErrors(errors) {
+        this._validationErrors = errors;
+    }
+
+    /**
+     * 
+     * @param property 
+     * @param def
+     */
+    get(property: string, def: ModelValue = undefined): ModelValue {
+        return Utils.getObjectProperty(this.values, property, def);
+    }
+
+    /**
+     * 
+     * @param property 
+     * @param value 
+     */
+    set(property: string, value: ModelValue): void {
+        Utils.setObjectProperty(this.values, property, value);
+    }
+
+    /**
+     * Gets the validation errors for a given property. If there are no validation errors for the
+     * property, then returns the default value given.
+     * 
+     * @param property the property to get the validation errors for.
+     * @param def the default value to return when there is no validation error.
+     */
+    errors(property: string, def: string | Array<string> = []): string | Array<string> {
+        return Utils.getObjectProperty(this.validationErrors, property, def);
+    }
+
     /**
      * Determines if the given observer already exists on the array of observers.
      * 
@@ -230,8 +265,12 @@ export abstract class Model extends Requestable implements Observable {
      * @returns the instance of the model for method chaining.
      */
     addTo(col: Collection | Array<Collection>): this {
-        if (col instanceof Collection) col.add(this);
-        else col.forEach(collection => collection.add(this));
+        const handler = (collection: Collection) => {
+            if (!collection.contains(this)) collection.add(this);
+        };
+
+        if (col instanceof Collection) handler(col);
+        else col.forEach(collection => handler(collection));
         return this;
     }
 
@@ -250,12 +289,26 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     /**
+     * 
+     */
+    mapSuccessResponse(response: SuccessResponse, action: string): SuccessResponse {
+        return response;
+    }
+
+    /**
+     * 
+     */
+    mapSaveValues(values: ModelValue, action: string): ModelValues {
+        return values;
+    }
+
+    /**
      * Fires the **MODEL_FETCHED** event on success.
      */
     async fetch() {
         return new Promise((resolve, reject) => {
             const success = (response: SuccessResponse) => {
-                this.values = response.data;
+                this.values = this.mapSuccessResponse(response, 'fetch').data;
 
                 this.sync();
 
@@ -276,8 +329,10 @@ export abstract class Model extends Requestable implements Observable {
      */
     async save() {
         return new Promise((resolve, reject) => {
+            const action = this.values.id ? (this.patchUpdates() ? 'patch' : 'update') : 'save';
+
             const success = (response: SuccessResponse) => {
-                this.values = response.data;
+                this.values = this.mapSuccessResponse(response, action).data;
 
                 this._deleted = false;
 
@@ -290,14 +345,14 @@ export abstract class Model extends Requestable implements Observable {
 
             const failure = (error: ErrorResponse) => {
                 // #TODO Add the errors to the error object.
-                if (this.validationErrorCode() == error.response.status) this._validationErrors = error.response.data;
+                if (this.validationErrorCode() == error.response.status) this.validationErrors = error.response.data.errors;
 
                 reject(error);
             }
 
-            let action = this.values.id ? (this.patchUpdates() ? 'patch' : 'update') : 'save';
+            const data = this.mapSaveValues(action == 'patch' ? this.dirtyValues : this.values, action);
 
-            let data = action == 'patch' ? this.dirtyValues : this.values;
+            this.validationErrors = {};
 
             this.request(action, data).then(success).catch(failure);
         });

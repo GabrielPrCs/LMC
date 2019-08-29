@@ -155,4 +155,46 @@ export const Tests = [
             assert.equal(model.values.title, "Testing chaining");
         }
     },
+    {
+        title: 'Model.get(property)',
+        description: '',
+        handler: function () {
+            let model = new Todo({ id: 1 });
+
+            model.values.title = "Testing chaining";
+
+            assert.equal(model.get('title'), "Testing chaining");
+            assert.equal(model.get('non-existing'), undefined);
+        }
+    },
+    {
+        title: 'Model.set(property, value)',
+        description: '',
+        handler: function () {
+            let model = new Todo({ id: 1 });
+
+            model.set('title', "Testing set function");
+            assert.equal(model.get('title'), "Testing set function");
+
+            assert.equal(model.get('posts[0].comment'), undefined);
+            model.set('posts[0].comment', 'Testing deep setting')
+            assert.equal(model.get('posts[0].comment'), 'Testing deep setting');
+        }
+    },
+    {
+        title: 'Model.mapSuccessResponse(response)',
+        description: '',
+        handler: async function () {
+            let model = new Todo({ id: 1 });
+
+            model.mapSuccessResponse = function (response: SuccessResponse, action: string): SuccessResponse {
+                response.data.title = 'This title has been changed on the mapSuccessResponse method';
+                return response;
+            }
+
+            await model.fetch();
+
+            assert.equal(model.values.title, 'This title has been changed on the mapSuccessResponse method');
+        }
+    }
 ];

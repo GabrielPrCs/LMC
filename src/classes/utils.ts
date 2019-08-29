@@ -2,6 +2,15 @@ import * as _ from 'lodash';
 import * as pluralize from 'pluralize';
 
 export abstract class Utils {
+
+    static getObjectProperty(object, property, def = undefined) {
+        return _.get(object, property, def);
+    }
+
+    static setObjectProperty(object, property, value) {
+        return _.set(object, property, value);
+    }
+
     /**
      * Given two objects, returns a new object with the attributes that are different between them both.
      * Does a deep comparison.

@@ -15,7 +15,7 @@
     "development": "tsc",
     "dev": "npm run development",
     "watch": "tsc -w",
-    "production": "tsc && browserify ./dist/src/main.js -o ./dist/browserify/bundle.js",
+    "production": "tsc && browserify ./dist/src/main.js -o ./dist/browserify/lmc.js",
     "prod": "npm run production",
     "test": "node ./dist/src/tests.js",
     "build-test": "npm run development && npm run test"

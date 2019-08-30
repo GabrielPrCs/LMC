@@ -1,8 +1,9 @@
 {
     "compilerOptions": {
         "target": "es5",
-        "outDir": "dist/src",
+        "outDir": "build",
         "moduleResolution": "node",
+        "declaration": true,
         "lib": ["es5", "es2017", "dom"],
         "baseUrl": "./src"
     }

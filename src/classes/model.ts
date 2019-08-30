@@ -19,7 +19,7 @@ export abstract class Model extends Requestable implements Observable {
      * 
      * The initial status will be merged to the default values, **giving priority to the passed values over the default ones**.
      * For this reason, is not necessary to pass the values of those properties that will have the default value. If no id
-     * is provided on the initial values, the model will considered as a new model that has not been persisted on backend yet (model.id === null).
+     * is provided on the initial values, the model will considered as a new model that has not been persisted on backend yet (model.id == null).
      *
      * The model will be added to each one of the collections passed.
      * 
@@ -104,6 +104,14 @@ export abstract class Model extends Requestable implements Observable {
      */
     set(property: string, value: ModelValue): void {
         Utils.setObjectProperty(this.values, property, value);
+    }
+
+    /**
+     * 
+     * @param property 
+     */
+    remove(property: string): void {
+
     }
 
     /**

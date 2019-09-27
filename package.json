@@ -1,24 +1,23 @@
 {
   "name": "lmcjs",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "A JS library to fetch, save/update and delete records from a Laravel API.",
   "main": "build/main.js",
   "types": "build/main.d.ts",
   "files": ["build/**/*"],
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "browserify": "^16.5.0",
     "axios": "^0.19.0",
     "lodash": "^4.17.15",
     "pluralize": "^8.0.0"
   },
-  "devDependencies": {
-    "browserify": "^16.5.0"
-  },
   "scripts": {
     "test": "tsc && node ./build/tests.js",
 
-    "build": "tsc && rm ./build/tests.js && rm ./build/browserify.js && rm ./build/browserify.d.ts && rm ./build/tests.d.ts && rm ./build/main.d.ts && rm -rf ./build/tests",
+    "build": "tsc && rm ./build/tests.js && rm ./build/browserify.js && rm ./build/browserify.d.ts && rm ./build/tests.d.ts && rm -rf ./build/tests",
 
-    "browserify": "npm run build && browserify ./build/browserify.js -o ./browserify/lmc.js",
+    "browserify": "tsc && browserify ./build/browserify.js -o ./browserify/lmc.js",
 
     "release": "npm run browserify",
 

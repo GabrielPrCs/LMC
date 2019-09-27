@@ -22,7 +22,6 @@ export const Tests = [
             let todos = new PaginatedTodos();
             await todos.fetch().then(_ => assert.deepEqual(todos.toArray(), page1));
             await todos.nextPage().then(_ => assert.deepEqual(todos.toArray(), page2));
-
         }
     },
     {

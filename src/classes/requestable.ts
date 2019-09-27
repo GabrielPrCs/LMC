@@ -99,6 +99,8 @@ export abstract class Requestable {
      * 
      */
     request(action: string, data = {}) {
+        if(this.loading) return;
+        
         const routes: HttpRoutes = this.routesFormater({ ...this.defaultRoutes(), ...this.routes() });
         const methods: HttpMethods = { ...this.defaultMethods(), ...this.methods() };
 

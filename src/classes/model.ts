@@ -2,17 +2,17 @@ import { Utils } from './utils';
 import { Requestable } from './requestable';
 import { Collection } from './collection';
 import { ObservableEvent, Observer, Observable, MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from '../interfaces/observer-observable';
-import { ModelValue, ModelValues } from '../interfaces/data-types';
+import { ModelValue, ModelValues, ValidationErrors } from '../interfaces/data-types';
 import { SuccessResponse, ErrorResponse } from '../interfaces/async-requests';
 import { HttpRoutes } from '../interfaces/data-types';
 
 export abstract class Model extends Requestable implements Observable {
 
+    private _deleted: boolean = false;
     private _values: ModelValues = {};
     private _syncValues: ModelValues = {};
-    private _deleted: boolean = false;
     private _observers: Array<Observer> = [];
-    private _validationErrors;
+    private _validationErrors: ValidationErrors = {};
 
     /**
      * Creates a new instance of the model.
@@ -36,6 +36,20 @@ export abstract class Model extends Requestable implements Observable {
         this.sync();
 
         this.addTo(collections);
+    }
+
+    /**
+     * Determines if the model is saved on the backend or not. A model is considered saved when it's key is not empty.
+     */
+    get exists(): boolean {
+        return this.key() != null;
+    }
+
+    /**
+     * Determines if the model has been successfully deleted from the backend.
+     */
+    get deleted(): boolean {
+        return this._deleted;
     }
 
     /**
@@ -71,44 +85,41 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     /**
-     * Determines if the model has been successfully deleted from the backend.
+     * An object with the validation errors from the a save attempt.
      */
-    get deleted(): boolean {
-        return this._deleted;
-    }
-
-    /**
-     * 
-     */
-    get validationErrors() {
+    get validationErrors(): ValidationErrors {
         return this._validationErrors;
     }
 
-    set validationErrors(errors) {
+    set validationErrors(errors: ValidationErrors) {
         this._validationErrors = errors;
     }
 
     /**
+     * Returns the value of a given property of the model. If the property does not exist, then returns the default value.
      * 
-     * @param property 
-     * @param def
+     * @param property the property to get.
+     * @param def the value to return when the property does not exist.
      */
     get(property: string, def: ModelValue = undefined): ModelValue {
         return Utils.getObjectProperty(this.values, property, def);
     }
 
     /**
+     * Sets the value of a given property of the model. If the property does not exist, then it's created.
      * 
-     * @param property 
-     * @param value 
+     * @param property the property to set.
+     * @param value the new value of the property.
      */
     set(property: string, value: ModelValue): void {
         Utils.setObjectProperty(this.values, property, value);
     }
 
     /**
+     * Removes a property from the model. The property wont be setted as null or undefined, it will be removed from the
+     * values object.
      * 
-     * @param property 
+     * @param property the property to remove.
      */
     remove(property: string): void {
 
@@ -166,13 +177,15 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     /**
+     * **[Chainable]**
      * Notifies to each observer that an event has happened. Sends the event and the model that has fired the event
      * to the observer.
      * 
      * @param event the event to notify.
      */
-    fire(event: ObservableEvent): void {
+    fire(event: ObservableEvent): this {
         this._observers.forEach(observer => observer.notify(event, this));
+        return this;
     }
 
     /**
@@ -181,7 +194,7 @@ export abstract class Model extends Requestable implements Observable {
      * @returns an ModelValues object with the status of a model that does not exists on backend yet.
      */
     defaults(): ModelValues {
-        return {};
+        return { id: null };
     }
 
     /**
@@ -299,6 +312,13 @@ export abstract class Model extends Requestable implements Observable {
     /**
      * 
      */
+    mapValuesToSave(values: ModelValue, action: string): ModelValues {
+        return values;
+    }
+
+    /**
+     * 
+     */
     mapSuccessResponse(response: SuccessResponse, action: string): SuccessResponse {
         return response;
     }
@@ -306,8 +326,8 @@ export abstract class Model extends Requestable implements Observable {
     /**
      * 
      */
-    mapSaveValues(values: ModelValue, action: string): ModelValues {
-        return values;
+    mapValidationErrors(error: ErrorResponse): ValidationErrors {
+        return error.response.data.errors;
     }
 
     /**
@@ -337,7 +357,7 @@ export abstract class Model extends Requestable implements Observable {
      */
     async save() {
         return new Promise((resolve, reject) => {
-            const action = this.values.id ? (this.patchUpdates() ? 'patch' : 'update') : 'save';
+            const action = this.exists ? (this.patchUpdates() ? 'patch' : 'update') : 'save';
 
             const success = (response: SuccessResponse) => {
                 this.values = this.mapSuccessResponse(response, action).data;
@@ -352,13 +372,12 @@ export abstract class Model extends Requestable implements Observable {
             };
 
             const failure = (error: ErrorResponse) => {
-                // #TODO Add the errors to the error object.
-                if (this.validationErrorCode() == error.response.status) this.validationErrors = error.response.data.errors;
+                if (this.validationErrorCode() == error.response.status) this.validationErrors = this.mapValidationErrors(error);
 
                 reject(error);
             }
 
-            const data = this.mapSaveValues(action == 'patch' ? this.dirtyValues : this.values, action);
+            const data = this.mapValuesToSave(action == 'patch' ? { ...this.dirtyValues } : { ...this.values }, action);
 
             this.validationErrors = {};
 

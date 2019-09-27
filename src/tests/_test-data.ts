@@ -48,6 +48,11 @@ export class PaginatedTodos extends PaginatedCollection {
     model() {
         return Todo;
     }
+
+    mapPaginationData(response) {
+        let TModel = this.model();
+        return response.data.map(model => new TModel(model));
+    }
 }
 
 export const Model1 = {

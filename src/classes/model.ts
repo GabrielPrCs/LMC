@@ -1,10 +1,12 @@
 import { Utils } from './utils';
-import { Requestable } from './requestable';
+import { Requestable, HttpMethod } from './requestable';
 import { Collection } from './collection';
 import { ObservableEvent, Observer, Observable, MODEL_ROLLBACK, MODEL_SYNC, MODEL_FETCHED, MODEL_SAVED, MODEL_DELETED } from '../interfaces/observer-observable';
-import { ModelValue, ModelValues, ValidationErrors } from '../interfaces/data-types';
-import { SuccessResponse, ErrorResponse } from '../interfaces/async-requests';
-import { HttpRoutes } from '../interfaces/data-types';
+import { SuccessResponse } from '../interfaces/async-requests';
+import { HttpRoutes } from './requestable';
+
+export type ModelValue = any;
+export interface ModelValues { [key: string]: ModelValue };
 
 export abstract class Model extends Requestable implements Observable {
 
@@ -12,7 +14,6 @@ export abstract class Model extends Requestable implements Observable {
     private _values: ModelValues = {};
     private _syncValues: ModelValues = {};
     private _observers: Array<Observer> = [];
-    private _validationErrors: ValidationErrors = {};
 
     /**
      * Creates a new instance of the model.
@@ -28,14 +29,62 @@ export abstract class Model extends Requestable implements Observable {
      */
     constructor(values: ModelValues = {}, collections: Array<Collection> = []) {
         super();
-
         this.values = values;
-
-        this.validationErrors = {};
-
         this.sync();
-
         this.addTo(collections);
+    }
+
+    /**
+     * Determines if the given observer already exists on the array of observers.
+     * 
+     * @param observer  the observer to check if is present.
+     * @return true if the observer is present, false otherwise.
+     */
+    observedBy(observer: Observer): boolean {
+        return Utils.inArray(this._observers, observer);
+    }
+
+    /**
+     * Adds an observer that will be notified when an event is fired. When an observer is notified,
+     * the notify function will be called with the event that is beeing fired and the instance of the model
+     * that fired the event.
+     * 
+     * If the observer already exists in the array of observers, then does nothing.
+     * 
+     * @param observer the observer to be added to the array of observers.
+     * @returns the instance of the model for method chaining.
+     */
+    addObserver(observer: Observer): void {
+        if (!this.observedBy(observer)) this._observers.push(observer);
+    }
+
+    /**
+     * Removes the given observer from the array of observers. If the observer was not in the array, then does nothing.
+     * 
+     * If the observer is as collection, also removes the model from the collection.
+     * 
+     * @param observer the observer to be removed from the list of observers.
+     * @returns the instance of the model for method chaining.
+     */
+    removeObserver(observer: Observer): void {
+        if (this.observedBy(observer)) Utils.remove(this._observers, observer);
+    }
+
+    /**
+     * Notifies to each observer that an event has happened. Sends the event and the model that has fired the event
+     * to the observer.
+     * 
+     * @param event the event to notify.
+     */
+    fire(event: ObservableEvent): void {
+        this._observers.forEach(observer => observer.notify(event, this));
+    }
+
+    /**
+     * Generates an unique id for the model using its values.
+     */
+    key(): any {
+        return this.values.id;
     }
 
     /**
@@ -60,7 +109,14 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     set values(values: ModelValues) {
-        this._values = { ...this.defaults(), ...this.values, ...values };
+        this._values = Utils.clone({ ...this.defaults(), ...this.values, ...values });
+    }
+
+    /**
+     * 
+     */
+    private get saveAction(): string {
+        return this.exists ? (this.patchUpdates() ? 'patch' : 'update') : 'save';
     }
 
     /**
@@ -68,6 +124,13 @@ export abstract class Model extends Requestable implements Observable {
      */
     get syncValues(): ModelValues {
         return this._syncValues;
+    }
+
+    /**
+     * The values that will be sended to the server to be saved.
+     */
+    get saveValues(): ModelValues {
+        return this.mapValuesToSave(Utils.clone(this.saveAction == 'patch' ? this.dirtyValues : this.values), this.saveAction)
     }
 
     /**
@@ -81,18 +144,7 @@ export abstract class Model extends Requestable implements Observable {
      * Determines if the model's values has changed since the last call of sync method.
      */
     get dirty(): boolean {
-        return !Utils.isEqual(this.dirtyValues, {});
-    }
-
-    /**
-     * An object with the validation errors from the a save attempt.
-     */
-    get validationErrors(): ValidationErrors {
-        return this._validationErrors;
-    }
-
-    set validationErrors(errors: ValidationErrors) {
-        this._validationErrors = errors;
+        return !Utils.isEqual(this.values, this.syncValues);
     }
 
     /**
@@ -126,82 +178,12 @@ export abstract class Model extends Requestable implements Observable {
     }
 
     /**
-     * Gets the validation errors for a given property. If there are no validation errors for the
-     * property, then returns the default value given.
-     * 
-     * @param property the property to get the validation errors for.
-     * @param def the default value to return when there is no validation error.
-     */
-    errors(property: string, def: string | Array<string> = []): string | Array<string> {
-        return Utils.getObjectProperty(this.validationErrors, property, def);
-    }
-
-    /**
-     * Determines if the given observer already exists on the array of observers.
-     * 
-     * @param observer  the observer to check if is present.
-     * @return true if the observer is present, false otherwise.
-     */
-    observedBy(observer: Observer): boolean {
-        return Utils.inArray(this._observers, observer);
-    }
-
-    /**
-     * **[Chainable]**
-     * Adds an observer that will be notified when an event is fired. When an observer is notified,
-     * the notify function will be called with the event that is beeing fired and the instance of the model
-     * that fired the event.
-     * 
-     * If the observer already exists in the array of observers, then does nothing.
-     * 
-     * @param observer the observer to be added to the array of observers.
-     * @returns the instance of the model for method chaining.
-     */
-    addObserver(observer: Observer): this {
-        if (!this.observedBy(observer)) this._observers.push(observer);
-        return this;
-    }
-
-    /**
-     * **[Chainable]**
-     * Removes the given observer from the array of observers. If the observer was not in the array, then does nothing.
-     * 
-     * If the observer is as collection, also removes the model from the collection.
-     * 
-     * @param observer the observer to be removed from the list of observers.
-     * @returns the instance of the model for method chaining.
-     */
-    removeObserver(observer: Observer): this {
-        if (this.observedBy(observer)) Utils.remove(this._observers, observer);
-        return this;
-    }
-
-    /**
-     * **[Chainable]**
-     * Notifies to each observer that an event has happened. Sends the event and the model that has fired the event
-     * to the observer.
-     * 
-     * @param event the event to notify.
-     */
-    fire(event: ObservableEvent): this {
-        this._observers.forEach(observer => observer.notify(event, this));
-        return this;
-    }
-
-    /**
      * The defaults values for each one of the model properties.
      * 
      * @returns an ModelValues object with the status of a model that does not exists on backend yet.
      */
     defaults(): ModelValues {
         return { id: null };
-    }
-
-    /**
-     * Generates an unique id for the model using its values.
-     */
-    key(): any {
-        return this.values.id;
     }
 
     /**
@@ -216,132 +198,87 @@ export abstract class Model extends Requestable implements Observable {
      */
     protected defaultRoutes(): HttpRoutes {
         return {
-            save: '/{name}',
-            fetch: '/{name}/{key}',
-            patch: '/{name}/{key}',
-            update: '/{name}/{key}',
-            delete: '/{name}/{key}'
+            save: `/${this.name()}`,
+            fetch: `/${this.name()}/${this.key()}`,
+            patch: `/${this.name()}/${this.key()}`,
+            update: `/${this.name()}/${this.key()}`,
+            delete: `/${this.name()}/${this.key()}`
         };
     }
 
     /**
-     * Given a set of routes, does the following replacements:
-     * 
-     * {key}  --> model.key()
-     * {name} --> model.name()
-     * 
-     * @param routes the object that contains the routes to give format.
-     * @return the formated routes.
-     */
-    protected routesFormater(routes: HttpRoutes): HttpRoutes {
-        let forRoutes = { ...routes };
-
-        for (var key in routes) if (routes.hasOwnProperty(key))
-            forRoutes[key] = routes[key].replace('{name}', this.name()).replace('{key}', this.key());
-
-        return forRoutes;
-    }
-
-    /**
-     * **[Chainable]**
      * Returns the model's values object to the last sync status. The current values object is lost.
      * 
      * @returns the instance of the model for method chaining.
      */
-    rollback(): this {
+    rollback(): void {
         this.values = this.syncValues;
         this.fire(MODEL_ROLLBACK);
-        return this;
     }
 
     /**
-     * **[Chainable]**
      * Sets the sync object to the current model's values object. The previous sync status is lost.
      * 
      * @returns the instance of the model for method chaining.
      */
-    sync(): this {
-        this._syncValues = { ...this.defaults(), ...this.syncValues, ...this.values };
+    sync(): void {
+        this._syncValues = Utils.clone({ ...this.defaults(), ...this.syncValues, ...this.values });
         this.fire(MODEL_SYNC);
-        return this;
     }
 
     /**
-     * **[Chainable]**
      * Sets the model's values object to it's defaults values.
      * 
      * @returns the instance of the model for method chaining.
      */
-    clear(): this {
-        this.values = this.defaults(); // As defaults() returns a new object each time, we don't need to use { ...this.defaults() }.
-        return this;
+    clear(): void {
+        this.values = this.defaults();
     }
 
     /**
-     * **[Chainable]**
      * Adds the model to one or more collections. This will have the same result than calling collection.add(model) on each
      * one of the collections.
      * 
      * @param col the collection or an array with the collections to where add the model.
      * @returns the instance of the model for method chaining.
      */
-    addTo(col: Collection | Array<Collection>): this {
+    addTo(col: Collection | Array<Collection>): void {
         const handler = (collection: Collection) => {
             if (!collection.contains(this)) collection.add(this);
         };
 
         if (col instanceof Collection) handler(col);
         else col.forEach(collection => handler(collection));
-        return this;
     }
 
     /**
-     * **[Chainable]**
      * Removes the model from one or more collections. This will have the same result than calling collection.remove(model) on each
      * one of the collections.
      * 
      * @param col the collection or an array with the collections from where remove the model.
      * @returns the instance of the model for method chaining.
      */
-    removeFrom(col: Collection | Array<Collection>): this {
+    removeFrom(col: Collection | Array<Collection>): void {
         if (col instanceof Collection) col.remove(this);
         else col.forEach(collection => collection.remove(this));
-        return this;
     }
 
     /**
-     * 
+     * Receives a copy of the model values. They can be mapped to send a different values to the server to be saved at the backend.
      */
     mapValuesToSave(values: ModelValue, action: string): ModelValues {
         return values;
     }
 
     /**
-     * 
-     */
-    mapSuccessResponse(response: SuccessResponse, action: string): SuccessResponse {
-        return response;
-    }
-
-    /**
-     * 
-     */
-    mapValidationErrors(error: ErrorResponse): ValidationErrors {
-        return error.response.data.errors;
-    }
-
-    /**
      * Fires the **MODEL_FETCHED** event on success.
      */
-    async fetch() {
-        return new Promise((resolve, reject) => {
+    async fetch(): Promise<SuccessResponse> {
+        return new Promise<SuccessResponse>((resolve, reject) => {
             const success = (response: SuccessResponse) => {
-                this.values = this.mapSuccessResponse(response, 'fetch').data;
-
+                this.values = response.data;
                 this.sync();
-
                 this.fire(MODEL_FETCHED);
-
                 resolve(response);
             };
 
@@ -355,33 +292,17 @@ export abstract class Model extends Requestable implements Observable {
      * 
      * Fires the **MODEL_SAVED** event on success.
      */
-    async save() {
-        return new Promise((resolve, reject) => {
-            const action = this.exists ? (this.patchUpdates() ? 'patch' : 'update') : 'save';
-
+    async save(): Promise<SuccessResponse> {
+        return new Promise<SuccessResponse>((resolve, reject) => {
             const success = (response: SuccessResponse) => {
-                this.values = this.mapSuccessResponse(response, action).data;
-
                 this._deleted = false;
-
+                this.values = response.data;
                 this.sync();
-
                 this.fire(MODEL_SAVED);
-
                 resolve(response);
             };
 
-            const failure = (error: ErrorResponse) => {
-                if (this.validationErrorCode() == error.response.status) this.validationErrors = this.mapValidationErrors(error);
-
-                reject(error);
-            }
-
-            const data = this.mapValuesToSave(action == 'patch' ? { ...this.dirtyValues } : { ...this.values }, action);
-
-            this.validationErrors = {};
-
-            this.request(action, data).then(success).catch(failure);
+            this.request(this.saveAction, this.saveValues).then(success).catch(reject);
         });
     }
 
@@ -391,8 +312,8 @@ export abstract class Model extends Requestable implements Observable {
      * 
      * Fires the **MODEL_DELETED** event on success.
      */
-    async delete() {
-        return new Promise((resolve, reject) => {
+    async delete(): Promise<SuccessResponse> {
+        return new Promise<SuccessResponse>((resolve, reject) => {
             const success = (response: SuccessResponse) => {
                 this._deleted = true;
                 this.fire(MODEL_DELETED);

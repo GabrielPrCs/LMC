@@ -27,6 +27,10 @@ export abstract class Utils {
         });
     }
 
+    static clone(object: object | Array<any>): object {
+        return JSON.parse(JSON.stringify(object));
+    }
+
     /**
      * 
      */
@@ -72,15 +76,15 @@ export abstract class Utils {
     /**
      * 
      */
-    static pluralize(word) {
+    static pluralize(word: string): string {
         return pluralize(word);
     }
 
     /**
      * 
      */
-    static classNameToApiRoute(className) {
-        return pluralize(className.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-')).toLowerCase();
+    static classNameToApiRoute(className: string): string {
+        return Utils.pluralize(className.replace(/([a-zA-Z])(?=[A-Z])/g, '$1-')).toLowerCase();
     }
 
     /**

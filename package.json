@@ -1,6 +1,6 @@
 {
   "name": "lmcjs",
-  "version": "1.0.4",
+  "version": "1.0.10",
   "description": "A JS library to fetch, save/update and delete records from a Laravel API.",
   "main": "build/main.js",
   "types": "build/main.d.ts",

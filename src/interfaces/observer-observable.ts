@@ -1,14 +1,14 @@
 export type ObservableEvent = number;
 
 export interface Observable {
-    fire: (event: ObservableEvent) => void,
-    addObserver: (observer: Observer) => this,
-    observedBy: (observer: Observer) => boolean,
-    removeObserver: (observer: Observer) => this;
+    fire: (event: ObservableEvent) => void;
+    addObserver: (observer: Observer) => void;
+    removeObserver: (observer: Observer) => void;
+    observedBy: (observer: Observer) => boolean;
 }
 
 export interface Observer {
-    notify: (event: ObservableEvent, model: Observable) => void,
+    notify: (event: ObservableEvent, model: Observable) => void;
 }
 
 /**

@@ -144,18 +144,6 @@ export const Tests = [
         }
     },
     {
-        title: 'Chaining model methods',
-        handler: function () {
-            let model = new Todo({ id: 1 });
-
-            model.values.title = "Testing chaining";
-
-            model.sync().rollback();
-
-            assert.equal(model.values.title, "Testing chaining");
-        }
-    },
-    {
         title: 'Model.get(property)',
         description: '',
         handler: function () {

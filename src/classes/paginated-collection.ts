@@ -1,84 +1,32 @@
 import { Model } from './model';
-import { Collection } from './collection';
-import { PaginationData } from '../interfaces/data-types';
-import { SuccessResponse, ErrorResponse } from '../interfaces/async-requests';
+import { LazyCollection } from './lazy-collection';
+import { ModelValue } from './model';
+import { RequestFilters } from './collection';
+import { SuccessResponse } from 'interfaces/async-requests';
 
-export abstract class PaginatedCollection extends Collection {
-    private _currentPage: number = 1;
-    private _paginationData: PaginationData<Model> = { items: [], hasMorePages: false };
-
-    constructor(models = [], page = 1) {
-        super(models);
-        this._currentPage = page;
-    }
-
-    get currentPage(): number {
-        return this._currentPage;
-    }
-
-    set currentPage(value: number) {
-        if (value < 1) this.currentPage = 1;
-        else this._currentPage = value;
-    }
-
-    pageParameter(): string {
-        return 'page';
-    }
-
-    mapPaginationData(response: SuccessResponse): PaginationData<Model> {
-        return {
-            items: response.data.data,
-            hasMorePages: response.data.next_page_url != null
-        };
-    }
-
-    get isFirstPage(): boolean {
-        return this.currentPage == 1;
-    }
-
-    get isLastPage(): boolean {
-        return !this._paginationData.hasMorePages;
+export abstract class PaginatedCollection extends LazyCollection {
+    constructor(models: Array<Model | ModelValue> = [], page: number = 1) {
+        super(models, page);
     }
 
     /**
      * 
      */
-    async fetch(params = {}) {
-        return new Promise((resolve, reject) => {
-
-            let config = { ...params }
-
-            config[this.pageParameter()] = this.currentPage;
-
-            const success = (response: SuccessResponse) => {
-                this.clear();
-                this._paginationData = this.mapPaginationData(response);
-                this.add(this._paginationData.items);
-                resolve(response);
-            };
-
-            this.request('fetch', config).then(success).catch(reject);
-        });
-    }
-
-    /**
-     * 
-     */
-    async nextPage(params = {}) {
+    async nextPage(filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.currentPage++;
-        return this.fetch(params);
+        return this.fetch(filters);
     }
 
     /**
      * 
      */
-    async previousPage(params = {}) {
+    async previousPage(filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.currentPage--;
-        return this.fetch(params);
+        return this.fetch(filters);
     }
 
-    async goToPage(number: number, params = {}) {
+    async goToPage(number: number, filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.currentPage = number;
-        return this.fetch(params);
+        return this.fetch(filters);
     }
 }

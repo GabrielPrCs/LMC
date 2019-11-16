@@ -50,8 +50,11 @@ export class PaginatedTodos extends PaginatedCollection {
     }
 
     mapPaginationData(response) {
-        let TModel = this.model();
-        return response.data.map(model => new TModel(model));
+        return { hasMorePages: true, items: response.data };
+    }
+
+    getItems(response) {
+        return response.data;
     }
 }
 

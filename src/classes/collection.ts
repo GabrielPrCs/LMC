@@ -1,15 +1,12 @@
-import { Utils } from './utils';
+import { Utils } from '../utils/methods';
 import { Requestable } from './requestable';
-import { Model } from './model';
-import { ObservableEvent, Observer, MODEL_DELETED } from '../interfaces/observer-observable';
-import { ModelValues } from './model';
-import { SuccessResponse, ErrorResponse } from 'interfaces/async-requests';
+import { Model, ModelValues, MODEL_DELETED } from './model';
+import { ObservableEvent, Observer, SuccessResponse, ErrorResponse } from '../utils/interfaces';
 
 export type RequestFilter = boolean | number | string | object;
 export interface RequestFilters { [key: string]: RequestFilter | Array<RequestFilter> };
 
 export abstract class Collection extends Requestable implements Observer {
-
     private _models: Array<Model> = [];
     private _staticFilters: RequestFilters = {};
 
@@ -23,18 +20,21 @@ export abstract class Collection extends Requestable implements Observer {
     }
 
     /**
+     * Creates a plain JavaScript array with the values of each model in the collection.
      * 
+     * @returns A plain array with the values of each model in the collection.
      */
     toArray(): Array<ModelValues> {
         return this.models.map(model => model.values);
     }
 
     /**
+     * Handles the notification of a model's event.
      * 
-     * @param event 
-     * @param model 
+     * @param event - The event that was fired by the model.
+     * @param model - The model that fired the event.
      */
-    notify(event: ObservableEvent, model: Model) {
+    notify(event: ObservableEvent, model: Model): void {
         switch (event) {
             case MODEL_DELETED:
                 this.remove(model);
@@ -43,15 +43,10 @@ export abstract class Collection extends Requestable implements Observer {
     }
 
     /**
-     * 
+     * Filters that are sent in every request.
      */
-    get staticFilters(): RequestFilters {
-        return this._staticFilters;
-    }
-
-    set staticFilters(filters: RequestFilters) {
-        this._staticFilters = filters;
-    }
+    get staticFilters(): RequestFilters { return this._staticFilters }
+    set staticFilters(filters: RequestFilters) { this._staticFilters = filters }
 
     /**
      * An array with all the models that are in the collection at the moment.
@@ -61,33 +56,53 @@ export abstract class Collection extends Requestable implements Observer {
     }
 
     /**
-     * 
+     * An array with the models in the collection that had been changed.
      */
     get dirtyModels(): Array<Model> {
         return Utils.filter(this.models, { dirty: true });
     }
 
     /**
+     * The class of the model that the collection contains. It will be used to create
+     * new models instances from a ModelValues object. It has to extend the Model class.
      * 
+     * @returns The class of the model that the collection contains.
      */
     abstract model();
 
     /**
+     * By default, a collection can perform two actions: fetch and save. Fetch will get from the backend the list of Models
+     * that match the given filters. Save will upload the dirty models to the backend.
      * 
+     * @returns An object where each key is an action and the value associated with it is the backend route for this action.
      */
     protected defaultRoutes() {
-        return {
-            fetch: `/${this.name()}`,
-            save: `/${this.name()}`,
-        };
+        return { fetch: `/${this.name()}`, save: `/${this.name()}` };
     }
 
     /**
-     * 
-     * @returns the instance of the model for method chaining.
+     * Removes all the models from the collection. No method of the model will be called nor will any of its values be changed.
      */
     clear(): void {
         this._models = [];
+    }
+
+    /**
+     * The number of models contained in the collection.
+     * 
+     * @returns The number of models contained.
+     */
+    count(): number {
+        return this.models.length;
+    }
+
+    /**
+     * Determines if the collection contains (or not) any model inside.
+     * 
+     * @returns True if the collection is empty, false otherwise.
+     */
+    empty(): boolean {
+        return this.models.length == 0;
     }
 
     /**
@@ -106,7 +121,6 @@ export abstract class Collection extends Requestable implements Observer {
     /**
      * 
      * @param mod the model or an array of models to remove from the collection.
-     * @returns the instance of the model for method chaining.
      */
     remove(filter: Model | ModelValues | Array<Model> | Array<ModelValues>): void {
         const handler = (model: Model | ModelValues) => {
@@ -178,29 +192,29 @@ export abstract class Collection extends Requestable implements Observer {
     /**
      * Called before the fetch is performed. Can be used to change filters or perform any other action.
      * 
-     * By default, removes the models contained in the collection before fetching the new ones.
+     * By default, does nothing.
      * 
      * @param filters 
      */
-    protected beforeFetch(filters: RequestFilters): void {
-        this.clear();
-    }
+    protected beforeFetch(filters: RequestFilters): void { }
 
     /**
-     * Called after the fetch is performed. Can be used to change the response or perform any other action.
+     * Called after the fetch is performed and before adding the new models to the collection.
+     * Can be used to change the response or perform any other action.
      * 
-     * By default, does nothing.
+     * By default, removes the models contained in the collection.
      * 
      * @param response 
      */
-    protected fetched(response: SuccessResponse): void { }
+    protected fetched(response: SuccessResponse): void {
+        this.clear();
+    }
 
     /**
      * 
      */
     async fetch(filters: RequestFilters = {}): Promise<SuccessResponse> {
         return new Promise<SuccessResponse>((resolve, reject) => {
-
             const success = (response: SuccessResponse) => {
                 this.fetched(response);
                 this.add(this.getItems(response).map((model: ModelValues) => new (this.model())(model)));
@@ -237,13 +251,13 @@ export abstract class Collection extends Requestable implements Observer {
 
                     model_keys.forEach(key => errors[key.replace(`${this.name()}.${index}.`, '')] = error.response.data.errors[key]);
 
-                    model.validationErrors = model.mapValidationErrors({ response: { data: { errors } } } as ErrorResponse);
+                    model.validationErrors = errors;
                 });
 
                 reject(error);
             }
 
-            const data = { [this.name()]: this.dirtyModels.map(model => model.values) };
+            const data = { [this.name()]: this.dirtyModels.map((model: Model) => model.saveValues) };
 
             this.request('save', data).then(success).catch(failure);
         });

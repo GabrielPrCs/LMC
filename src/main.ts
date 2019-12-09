@@ -3,6 +3,6 @@ import { Collection } from './classes/collection';
 import { PaginatedCollection } from './classes/paginated-collection';
 import { ScrollableCollection } from './classes/scrollable-collection';
 
-import { MODEL_SYNC, MODEL_SAVED, MODEL_FETCHED, MODEL_DELETED, MODEL_ROLLBACK } from './interfaces/observer-observable';
+import { MODEL_SYNC, MODEL_SAVED, MODEL_FETCHED, MODEL_DELETED, MODEL_ROLLBACK } from './classes/model';
 
 export { Model, Collection, PaginatedCollection, ScrollableCollection, MODEL_SYNC, MODEL_SAVED, MODEL_FETCHED, MODEL_DELETED, MODEL_ROLLBACK };

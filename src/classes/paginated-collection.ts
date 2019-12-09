@@ -1,8 +1,7 @@
-import { Model } from './model';
-import { LazyCollection } from './lazy-collection';
-import { ModelValue } from './model';
+import { Model, ModelValue } from './model';
 import { RequestFilters } from './collection';
-import { SuccessResponse } from 'interfaces/async-requests';
+import { LazyCollection } from './lazy-collection';
+import { SuccessResponse } from '../utils/interfaces';
 
 export abstract class PaginatedCollection extends LazyCollection {
     constructor(models: Array<Model | ModelValue> = [], page: number = 1) {
@@ -11,6 +10,7 @@ export abstract class PaginatedCollection extends LazyCollection {
 
     /**
      * 
+     * @param filters 
      */
     async nextPage(filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.currentPage++;
@@ -19,12 +19,18 @@ export abstract class PaginatedCollection extends LazyCollection {
 
     /**
      * 
+     * @param filters 
      */
     async previousPage(filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.currentPage--;
         return this.fetch(filters);
     }
 
+    /**
+     * 
+     * @param number 
+     * @param filters 
+     */
     async goToPage(number: number, filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.currentPage = number;
         return this.fetch(filters);

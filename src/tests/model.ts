@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { Todo, Model1 } from './_test-data';
-import { SuccessResponse } from '../interfaces/async-requests';
+import { SuccessResponse } from '../utils/interfaces';
 
 export const Tests = [
     {

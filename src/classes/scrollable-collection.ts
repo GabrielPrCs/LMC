@@ -1,8 +1,7 @@
-import { Model } from './model';
-import { LazyCollection } from './lazy-collection';
-import { ModelValue } from './model';
+import { Model, ModelValue } from './model';
 import { RequestFilters } from './collection';
-import { SuccessResponse } from 'interfaces/async-requests';
+import { LazyCollection } from './lazy-collection';
+import { SuccessResponse } from '../utils/interfaces';
 
 export abstract class ScrollableCollection extends LazyCollection {
     constructor(models: Array<Model | ModelValue> = [], page: number = 0) {
@@ -13,7 +12,7 @@ export abstract class ScrollableCollection extends LazyCollection {
      * 
      * @param params 
      */
-    protected beforeFetch(params: RequestFilters): void { }
+    protected fetched(response: SuccessResponse): void { }
 
     /**
      * 

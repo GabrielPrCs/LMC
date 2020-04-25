@@ -37,7 +37,7 @@ export abstract class ScrollableCollection extends LazyCollection {
      */
     async reset(filters: RequestFilters = {}): Promise<SuccessResponse> {
         this.clear();
-        this.currentPage = 0;
+        this._currentPage = 0;
         return this.more(filters);
     }
 }

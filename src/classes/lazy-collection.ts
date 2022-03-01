@@ -2,14 +2,14 @@ import { SuccessResponse } from '../utils/interfaces';
 import { Model, ModelValues, ModelValue } from './model';
 import { Collection, RequestFilters } from './collection';
 
-export interface PaginationData<T> { items: Array<T>, lastPage: boolean };
+export interface PaginationData<T> { items: Array<T>, lastPage: boolean, total: number | null };
 
 /**
  * A collection where the items are not retrived all at the same time, but they are fetched in chuncks.
  */
 export abstract class LazyCollection extends Collection {
     protected _currentPage: number = 1;
-    protected _paginationData: PaginationData<Model> = { items: [], lastPage: true };
+    protected _paginationData: PaginationData<Model> = { items: [], lastPage: true, total: 0 };
 
     constructor(models: Array<Model | ModelValue> = [], page: number = 1) {
         super(models);
@@ -50,6 +50,10 @@ export abstract class LazyCollection extends Collection {
         return this._paginationData.lastPage;
     }
 
+    get total() : number | null {
+        return this._paginationData.total;
+    }
+
     /**
      * 
      * @param filters 
@@ -72,7 +76,7 @@ export abstract class LazyCollection extends Collection {
      * @returns
      */
     mapPaginationData(response: SuccessResponse): PaginationData<Model> {
-        return { items: response.data.data, lastPage: response.data.next_page_url == null };
+        return { items: response.data.data, lastPage: response.data.next_page_url == null, total: response.data.total };
     }
 
     /**

@@ -50,7 +50,7 @@ export class PaginatedTodos extends PaginatedCollection {
     }
 
     mapPaginationData(response) {
-        return { lastPage: true, items: response.data };
+        return { lastPage: true, items: response.data, total: response.data.total};
     }
 
     getItems(response) {
